@@ -1,0 +1,13 @@
+project_id = "ssc-exam-platform"
+
+# JWT verification is handled inside each function (auth.getUser), which
+# also keeps CORS preflights simple. Unauthenticated calls are rejected
+# in code with a 401.
+[functions.start-attempt]
+verify_jwt = false
+
+[functions.submit-attempt]
+verify_jwt = false
+
+[functions.practice-answer]
+verify_jwt = false
