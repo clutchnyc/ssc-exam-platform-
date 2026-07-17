@@ -13,6 +13,23 @@ export default function CertificatePage() {
   const { code } = useParams();
   const { session } = useAuth();
   const [cert, setCert] = useState(undefined); // undefined = loading, null = not found
+  const [nameSize, setNameSize] = useState(null); // cqw, measured to fill the zone
+
+  // Measure the name in IvyPresto and size it to fill the awarded-to zone
+  // (63.5cqw wide): shorter names render much larger, long names shrink.
+  useEffect(() => {
+    if (!cert) return;
+    let cancelled = false;
+    document.fonts.load("400 100px ivypresto-display").then(() => {
+      if (cancelled) return;
+      const ctx = document.createElement("canvas").getContext("2d");
+      ctx.font = "400 100px ivypresto-display, Georgia, serif";
+      const widthPer100px = ctx.measureText(cert.profiles.full_name).width;
+      const byWidth = (63.5 * 0.94) / (widthPer100px / 100);
+      setNameSize(Math.min(byWidth, 10.5)); // height cap: zone is ~15.4cqw tall
+    });
+    return () => { cancelled = true; };
+  }, [cert]);
 
   // Dev-only mock so the diploma layout can be previewed without a session:
   // /certificate/PREVIEW (never matches in production builds)
@@ -20,11 +37,13 @@ export default function CertificatePage() {
 
   useEffect(() => {
     if (isPreview) {
-      // ?name= lets us try different name lengths while tuning the layout
-      const mockName = new URLSearchParams(window.location.search).get("name");
+      // ?name= / ?year= let us try lengths and years while tuning the layout
+      const params = new URLSearchParams(window.location.search);
+      const mockName = params.get("name");
+      const mockYear = params.get("year");
       setCert({
         verify_code: "SSC-2026-QK7M3",
-        issued_at: new Date().toISOString(),
+        issued_at: mockYear ? `${mockYear}-07-17T12:00:00Z` : new Date().toISOString(),
         attempts: { score_pct: 92, exams: { title: "Sake Server Certification", pass_pct: 80 } },
         profiles: { full_name: mockName || "Alexandra Yamamoto-Rodriguez" },
       });
@@ -65,9 +84,7 @@ export default function CertificatePage() {
     year: "numeric", month: "long", day: "numeric",
   }).toUpperCase();
   const name = cert.profiles.full_name;
-  // Continuous fit: size tracks name length so any name fills the
-  // awarded-to zone on a single line (IvyPresto avg glyph ≈ 0.5em).
-  const nameSize = Math.max(2.6, Math.min(6.2, 108 / name.length)); // cqw
+  const year = String(new Date(cert.issued_at).getFullYear());
 
   return (
     <div>
@@ -85,18 +102,28 @@ export default function CertificatePage() {
             </span>
           ))}
         </div>
-        {/* Student name — IvyPresto Display, SSC green, sized to fit */}
+        {/* Student name — IvyPresto Display, SSC green, measured to fill the zone */}
         <div style={{ position: "absolute", left: "27%", top: "38.5%", width: "63.5%", height: "20%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <span style={{ fontFamily: fontCertName, fontWeight: 400, fontSize: `${nameSize}cqw`, lineHeight: 1.05, color: C.brandGreen, whiteSpace: "nowrap" }}>
+          <span style={{ fontFamily: fontCertName, fontWeight: 400, fontSize: `${nameSize ?? 5}cqw`, lineHeight: 1.05, color: C.brandGreen, whiteSpace: "nowrap", visibility: nameSize ? "visible" : "hidden" }}>
             {name}
+          </span>
+        </div>
+        {/* Ribbon year — covers the artwork's baked-in digits with the exact
+            ribbon green (#41b56f, sampled) and renders the issue year */}
+        <div style={{ position: "absolute", left: "11.55%", top: "9.4%", width: "3.2%", height: "4.4%", background: "#41b56f", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
+          <span style={{ fontFamily: fontCertLabel, fontWeight: 700, fontSize: "1.05cqw", letterSpacing: "0.42em", color: "#3a3734", textIndent: "0.42em", marginBottom: "0.45cqw" }}>
+            {year.slice(0, 2)}
+          </span>
+          <span style={{ fontFamily: fontCertLabel, fontWeight: 700, fontSize: "1.05cqw", letterSpacing: "0.42em", color: "#3a3734", textIndent: "0.42em" }}>
+            {year.slice(2)}
           </span>
         </div>
         {/* Verify URL + code — bottom left, under the signature block */}
         <div style={{ position: "absolute", left: "8.3%", top: "85.2%", width: "50%", whiteSpace: "nowrap" }}>
-          <div style={{ fontFamily: fontMono, fontWeight: 600, fontSize: "1.5cqw", letterSpacing: "0.04em", color: C.ink }}>
+          <div style={{ fontFamily: fontMono, fontWeight: 600, fontSize: "1.1cqw", letterSpacing: "0.04em", color: C.ink }}>
             Certificate no. {cert.verify_code}
           </div>
-          <div style={{ fontFamily: fontMono, fontSize: "1.35cqw", letterSpacing: "0.02em", color: C.body, marginTop: "0.4cqw" }}>
+          <div style={{ fontFamily: fontMono, fontSize: "1cqw", letterSpacing: "0.02em", color: C.body, marginTop: "0.35cqw" }}>
             Verify at {window.location.host}/verify/{cert.verify_code}
           </div>
         </div>
