@@ -39,4 +39,12 @@ input:focus-visible {
     max-width: none !important;
     width: 100vw;
   }
+  /* Print colors as authored: keeps the ribbon patch's background (the
+     dynamic-year cover) and stops the browser from "optimizing" the
+     IvyPresto name green to a different shade. */
+  .cert-sheet,
+  .cert-sheet * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }
