@@ -104,12 +104,14 @@ function Catalog() {
       navigate(`/join/${encodeURIComponent(pending)}`, { replace: true });
       return;
     }
+    // Professional-track exams only — video-course quizzes live on their
+    // course page, not the landing grid.
     supabase
       .from("exams")
-      .select("*")
+      .select("*, courses:course_id(delivery)")
       .eq("is_published", true)
       .order("mode", { ascending: false }) // practice first
-      .then(({ data }) => setExams(data ?? []));
+      .then(({ data }) => setExams((data ?? []).filter((e) => e.courses?.delivery !== "video")));
     supabase
       .from("certificates")
       .select("verify_code, issued_at, attempts:attempt_id(exams:exam_id(title))")
