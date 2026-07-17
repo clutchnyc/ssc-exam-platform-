@@ -40,7 +40,7 @@ export default function Login() {
             Check your email — we sent a sign-in link to <strong>{email}</strong>.
             Click it and you'll land back here, signed in. You can close this tab.
           </p>
-          <button onClick={() => setState("idle")} style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 3, padding: "10px 18px", fontSize: 13, cursor: "pointer", fontFamily: fontBody, color: C.ink }}>
+          <button onClick={() => setState("idle")} style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 0, padding: "10px 18px", fontSize: 13, cursor: "pointer", fontFamily: fontBody, color: C.ink }}>
             Use a different email
           </button>
         </div>
@@ -67,7 +67,7 @@ export default function Login() {
           <button
             type="submit"
             disabled={state === "sending" || !email.trim()}
-            style={{ width: "100%", marginTop: 22, background: C.indigo, opacity: state === "sending" || !email.trim() ? 0.45 : 1, color: "#fff", border: "none", borderRadius: 3, padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
+            style={{ width: "100%", marginTop: 22, background: C.brandGreen, opacity: state === "sending" || !email.trim() ? 0.45 : 1, color: "#fff", border: "none", borderRadius: 0, padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
           >
             {state === "sending" ? "Sending…" : "Send magic link"}
           </button>

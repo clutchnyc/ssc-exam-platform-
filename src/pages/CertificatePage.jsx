@@ -101,13 +101,13 @@ export default function CertificatePage() {
       <div className="no-print" style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 24 }}>
         <button
           onClick={() => window.print()}
-          style={{ background: C.indigoDeep, color: "#fff", border: "none", borderRadius: 3, padding: "12px 26px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
+          style={{ background: C.brandGreen, color: "#fff", border: "none", borderRadius: 0, padding: "12px 26px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
         >
           Print / save as PDF
         </button>
         <Link
           to="/"
-          style={{ border: `1px solid ${C.line}`, color: C.ink, borderRadius: 3, padding: "12px 20px", fontSize: 14, textDecoration: "none", fontFamily: fontBody, background: "transparent" }}
+          style={{ border: `1px solid ${C.line}`, color: C.ink, borderRadius: 0, padding: "12px 20px", fontSize: 14, textDecoration: "none", fontFamily: fontBody, background: "transparent" }}
         >
           Back to portal
         </Link>

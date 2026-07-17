@@ -118,7 +118,7 @@ function Setup({ exam, profile, attemptsUsed, error, starting, onBegin }) {
         <button
           onClick={onBegin}
           disabled={starting || outOfAttempts}
-          style={{ flex: 1, background: isCert ? C.hanko : C.indigo, opacity: starting || outOfAttempts ? 0.45 : 1, color: "#fff", border: "none", borderRadius: 3, padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
+          style={{ flex: 1, background: C.brandGreen, opacity: starting || outOfAttempts ? 0.45 : 1, color: "#fff", border: "none", borderRadius: 0, padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
         >
           {outOfAttempts
             ? "No attempts remaining"
@@ -130,7 +130,7 @@ function Setup({ exam, profile, attemptsUsed, error, starting, onBegin }) {
         </button>
         <button
           onClick={() => navigate("/")}
-          style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 3, padding: "12px 18px", fontSize: 14, cursor: "pointer", fontFamily: fontBody, color: C.ink }}
+          style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 0, padding: "12px 18px", fontSize: 14, cursor: "pointer", fontFamily: fontBody, color: C.ink }}
         >
           Cancel
         </button>
@@ -314,7 +314,7 @@ function Runner({ exam, run, onDone }) {
             <button
               onClick={checkShortAnswer}
               disabled={!answered || checking || submitting}
-              style={{ background: C.indigo, color: "#fff", border: "none", borderRadius: 4, padding: "14px 22px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, opacity: !answered || checking || submitting ? 0.4 : 1 }}
+              style={{ background: C.brandGreen, color: "#fff", border: "none", borderRadius: 0, padding: "14px 22px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, opacity: !answered || checking || submitting ? 0.4 : 1 }}
             >
               {checking ? "Checking…" : "Check answer"}
             </button>
@@ -362,7 +362,7 @@ function Runner({ exam, run, onDone }) {
         <button
           onClick={next}
           disabled={!answered || checking || submitting || (!isCert && !fb)}
-          style={{ background: C.indigoDeep, color: "#fff", border: "none", borderRadius: 3, padding: "12px 28px", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: !answered || checking || submitting || (!isCert && !fb) ? 0.4 : 1, fontFamily: fontBody }}
+          style={{ background: C.brandGreen, color: "#fff", border: "none", borderRadius: 0, padding: "12px 28px", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: !answered || checking || submitting || (!isCert && !fb) ? 0.4 : 1, fontFamily: fontBody }}
         >
           {submitting ? "Submitting…" : idx + 1 === questions.length ? "Finish" : "Next question"}
         </button>
@@ -425,14 +425,16 @@ function Result({ exam, result, profile }) {
         {result.certificate && (
           <button
             onClick={() => navigate(`/certificate/${result.certificate.verify_code}`)}
-            style={{ background: C.hanko, color: "#fff", border: "none", borderRadius: 3, padding: "12px 24px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
+            style={{ background: C.brandGreen, color: "#fff", border: "none", borderRadius: 0, padding: "12px 24px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
           >
             View your certificate
           </button>
         )}
         <button
           onClick={() => navigate("/")}
-          style={{ background: C.indigo, color: "#fff", border: "none", borderRadius: 3, padding: "12px 24px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
+          style={result.certificate
+            ? { background: "transparent", color: C.ink, border: `1px solid ${C.line}`, borderRadius: 0, padding: "12px 24px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }
+            : { background: C.brandGreen, color: "#fff", border: "none", borderRadius: 0, padding: "12px 24px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
         >
           Back to portal
         </button>

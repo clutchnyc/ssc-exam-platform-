@@ -93,7 +93,7 @@ export default function AdminPage() {
           <button
             onClick={exportCsv}
             disabled={visible.length === 0}
-            style={{ background: C.indigo, color: "#fff", border: "none", borderRadius: 3, padding: "10px 18px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, opacity: visible.length === 0 ? 0.45 : 1 }}
+            style={{ background: C.brandGreen, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, opacity: visible.length === 0 ? 0.45 : 1 }}
           >
             Export CSV ({visible.length})
           </button>

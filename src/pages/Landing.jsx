@@ -21,7 +21,7 @@ function Loading() {
 function Hero() {
   return (
     <div style={{ textAlign: "center", paddingTop: 40 }}>
-      <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.2em", color: C.hanko, fontWeight: 600, marginBottom: 8 }}>Assessment</p>
+      <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.2em", color: C.brandGreen, fontWeight: 600, marginBottom: 8 }}>Assessment</p>
       <h1 style={{ fontFamily: fontDisplay, fontSize: 34, fontWeight: 700, lineHeight: 1.2, margin: "0 0 10px" }}>Test your sake knowledge.</h1>
       <p style={{ color: C.body, maxWidth: 460, lineHeight: 1.6, margin: "0 auto 32px" }}>
         Practice freely with instant feedback, or sit the timed certification
@@ -30,7 +30,7 @@ function Hero() {
       </p>
       <Link
         to="/login"
-        style={{ display: "inline-block", background: C.indigo, color: "#fff", borderRadius: 3, padding: "13px 34px", fontSize: 14, fontWeight: 600, textDecoration: "none", fontFamily: fontBody }}
+        style={{ display: "inline-block", background: C.brandGreen, color: "#fff", borderRadius: 0, padding: "13px 34px", fontSize: 14, fontWeight: 600, textDecoration: "none", fontFamily: fontBody }}
       >
         Sign in to begin
       </Link>
@@ -77,7 +77,7 @@ function CompleteProfile() {
         <button
           type="submit"
           disabled={saving || !name.trim()}
-          style={{ width: "100%", marginTop: 22, background: C.indigo, opacity: saving || !name.trim() ? 0.45 : 1, color: "#fff", border: "none", borderRadius: 3, padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
+          style={{ width: "100%", marginTop: 22, background: C.brandGreen, opacity: saving || !name.trim() ? 0.45 : 1, color: "#fff", border: "none", borderRadius: 0, padding: "12px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
         >
           {saving ? "Saving…" : "Continue"}
         </button>
@@ -109,7 +109,7 @@ function Catalog() {
 
   return (
     <div>
-      <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.2em", color: C.hanko, fontWeight: 600, marginBottom: 8 }}>Assessment</p>
+      <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.2em", color: C.brandGreen, fontWeight: 600, marginBottom: 8 }}>Assessment</p>
       <h1 style={{ fontFamily: fontDisplay, fontSize: 34, fontWeight: 700, lineHeight: 1.2, margin: "0 0 10px" }}>Test your sake knowledge.</h1>
       <p style={{ color: C.body, maxWidth: 520, lineHeight: 1.6, marginBottom: 36 }}>
         Practice freely with instant feedback, or sit the timed certification
@@ -139,7 +139,7 @@ function Catalog() {
               </p>
               <button
                 onClick={() => navigate(`/exam/${exam.slug}`)}
-                style={{ background: isCert ? C.hanko : C.indigo, color: "#fff", border: "none", borderRadius: 3, padding: "11px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
+                style={{ background: C.brandGreen, color: "#fff", border: "none", borderRadius: 0, padding: "11px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
               >
                 {isCert ? "Begin exam" : "Start practicing"}
               </button>

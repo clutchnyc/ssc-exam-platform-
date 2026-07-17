@@ -60,7 +60,7 @@ export default function VerifyPage() {
         <button
           type="submit"
           disabled={!input.trim() || state.status === "loading"}
-          style={{ background: C.indigo, color: "#fff", border: "none", borderRadius: 4, padding: "12px 24px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, opacity: !input.trim() || state.status === "loading" ? 0.45 : 1 }}
+          style={{ background: C.brandGreen, color: "#fff", border: "none", borderRadius: 0, padding: "12px 24px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, opacity: !input.trim() || state.status === "loading" ? 0.45 : 1 }}
         >
           {state.status === "loading" ? "Checking…" : "Verify"}
         </button>

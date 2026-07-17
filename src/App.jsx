@@ -53,7 +53,7 @@ function Header() {
       }}
     >
       <Link to="/" style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: C.ink }}>
-        <img src={logoHorizontal} alt="Sake Studies Center at Brooklyn Kura" style={{ height: 46, width: "auto", display: "block" }} />
+        <img src={logoHorizontal} alt="Sake Studies Center at Brooklyn Kura" style={{ height: 72, width: "auto", display: "block" }} />
         <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.18em", color: C.mist, borderLeft: `1px solid ${C.line}`, paddingLeft: 14 }}>
           Exam Portal
         </span>
@@ -62,7 +62,7 @@ function Header() {
         {session ? (
           <>
             {profile?.role === "admin" && (
-              <Link to="/admin" style={{ fontSize: 13, fontWeight: 600, color: C.indigo, textDecoration: "none" }}>
+              <Link to="/admin" style={{ fontSize: 13, fontWeight: 600, color: C.green, textDecoration: "none" }}>
                 Admin
               </Link>
             )}
@@ -87,8 +87,8 @@ function Header() {
 }
 
 const headerBtn = {
-  background: C.ink, color: "#fff", border: `1px solid ${C.ink}`,
-  borderRadius: 3, padding: "6px 16px", fontSize: 13, fontWeight: 600,
+  background: C.brandGreen, color: "#fff", border: `1px solid ${C.brandGreen}`,
+  borderRadius: 0, padding: "7px 18px", fontSize: 13, fontWeight: 600,
   cursor: "pointer", fontFamily: fontBody,
 };
 
