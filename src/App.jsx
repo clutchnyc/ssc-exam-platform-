@@ -7,6 +7,7 @@ import Login from "./pages/Login";
 import ExamPage from "./pages/ExamPage";
 import CoursePage from "./pages/CoursePage";
 import EnrollPage from "./pages/EnrollPage";
+import DiscussionPage from "./pages/DiscussionPage";
 import CertificatePage from "./pages/CertificatePage";
 import VerifyPage from "./pages/VerifyPage";
 import AdminPage from "./pages/AdminPage";
@@ -35,6 +36,7 @@ function Shell() {
           <Route path="/login" element={<Login />} />
           <Route path="/exam/:slug" element={<ExamPage />} />
           <Route path="/course/:slug" element={<CoursePage />} />
+          <Route path="/course/:slug/discussion" element={<DiscussionPage />} />
           <Route path="/enroll/:slug" element={<EnrollPage />} />
           <Route path="/certificate/:code" element={<CertificatePage />} />
           <Route path="/verify" element={<VerifyPage />} />

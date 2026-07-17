@@ -236,6 +236,12 @@ export default function CoursePage() {
                     📄 Download: {resource.name ?? "course material"}
                   </a>
                 )}
+                <p style={{ fontSize: 13, color: C.mist, margin: "12px 0 0" }}>
+                  💬 Questions about this module?{" "}
+                  <Link to={`/course/${course.slug}/discussion?module=${active.id}`} style={{ color: C.green, fontWeight: 600 }}>
+                    Ask on the discussion board
+                  </Link>
+                </p>
               </div>
             </>
           ) : (
@@ -268,6 +274,13 @@ export default function CoursePage() {
               </button>
             );
           })}
+
+          <Link
+            to={`/course/${course.slug}/discussion`}
+            style={{ display: "block", textAlign: "center", border: `1px solid ${C.line}`, padding: "11px 14px", fontSize: 13.5, fontWeight: 600, textDecoration: "none", color: C.ink, fontFamily: fontBody, background: C.paper }}
+          >
+            💬 Course discussion board
+          </Link>
 
           {quiz && (
             <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderTop: `3px solid ${allDone ? C.brandGreen : C.line}`, borderRadius: 4, padding: 18, marginTop: 8 }}>
