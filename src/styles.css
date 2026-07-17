@@ -26,14 +26,17 @@ input:focus-visible {
   outline-offset: 2px;
 }
 
-/* Certificate printing: just the sheet, edge to edge on white */
+/* Certificate printing: the diploma alone, landscape, edge to edge */
+@page {
+  size: letter landscape;
+  margin: 0;
+}
 @media print {
   .no-print { display: none !important; }
   body { background: #fff; }
   main { max-width: none !important; padding: 0 !important; margin: 0 !important; }
   .cert-sheet {
-    border: none !important;
-    border-radius: 0 !important;
     max-width: none !important;
+    width: 100vw;
   }
 }
