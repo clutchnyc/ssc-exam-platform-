@@ -148,6 +148,8 @@ Deno.serve(async (req) => {
           .insert({
             attempt_id,
             user_id: user.id,
+            enrollment_id: attempt.enrollment_id ?? null,
+            cert_type: "professional",
             verify_code: makeVerifyCode(),
           })
           .select("id, verify_code")

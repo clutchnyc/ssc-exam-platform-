@@ -149,9 +149,25 @@ Deno.serve(async (req) => {
         : shuffle((q.options as string[]).map((_, i) => i)),
     }));
 
+    // ——— Ensure a course enrollment exists, and stamp it on the attempt ———
+    // Class-gated students are enrolled via join_class(); this also covers
+    // admins (who bypass the class gate) and any legacy gap.
+    let enrollment_id: string | null = null;
+    if (exam.course_id) {
+      const { data: enr } = await db
+        .from("course_enrollments")
+        .upsert(
+          { profile_id: user.id, course_id: exam.course_id },
+          { onConflict: "profile_id,course_id", ignoreDuplicates: false },
+        )
+        .select("id")
+        .single();
+      enrollment_id = enr?.id ?? null;
+    }
+
     const { data: attempt, error: insertErr } = await db
       .from("attempts")
-      .insert({ user_id: user.id, exam_id, question_set })
+      .insert({ user_id: user.id, exam_id, question_set, enrollment_id })
       .select("id, started_at")
       .single();
     if (insertErr) throw insertErr;
