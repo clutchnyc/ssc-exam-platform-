@@ -174,6 +174,7 @@ function NewCourseCard({ onCreated }) {
 
 function CourseEditor({ course, onChanged }) {
   const [title, setTitle] = useState(course.title);
+  const [price, setPrice] = useState(course.price_cents != null ? String(course.price_cents / 100) : "");
   const [published, setPublished] = useState(course.is_published);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -192,12 +193,18 @@ function CourseEditor({ course, onChanged }) {
 
   async function saveCourse() {
     if (!title.trim()) return setError("Title is required.");
+    let priceCents = null;
+    if (course.track === "consumer" && String(price).trim() !== "") {
+      const p = Number(price);
+      if (!Number.isFinite(p) || p < 0.5) return setError("Price must be at least $0.50 (or blank while not for sale).");
+      priceCents = Math.round(p * 100);
+    }
     setSaving(true);
     setError("");
     setSaved(false);
     const { error: err } = await supabase
       .from("courses")
-      .update({ title: title.trim(), is_published: published })
+      .update({ title: title.trim(), is_published: published, price_cents: priceCents })
       .eq("id", course.id);
     setSaving(false);
     if (err) return setError(err.message);
@@ -230,10 +237,21 @@ function CourseEditor({ course, onChanged }) {
 
   return (
     <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderTop: `3px solid ${C.brandGreen}`, padding: 22 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(200px, 1fr) auto", gap: 12, alignItems: "end", maxWidth: 640 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(200px, 2fr) minmax(110px, 1fr) auto", gap: 12, alignItems: "end", maxWidth: 720 }}>
         <div>
           <label style={labelStyle}>Course title</label>
           <input value={title} onChange={(e) => { setTitle(e.target.value); setSaved(false); }} style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Price (USD)</label>
+          <input
+            type="number" min="0.5" step="0.01"
+            value={price}
+            placeholder="not for sale"
+            disabled={course.track !== "consumer"}
+            onChange={(e) => { setPrice(e.target.value); setSaved(false); }}
+            style={{ ...inputStyle, opacity: course.track !== "consumer" ? 0.5 : 1 }}
+          />
         </div>
         <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13.5, cursor: "pointer", paddingBottom: 9 }}>
           <input
@@ -247,6 +265,7 @@ function CourseEditor({ course, onChanged }) {
       </div>
       <p style={{ fontFamily: fontMono, fontSize: 11.5, color: C.mist, margin: "8px 0 0" }}>
         /course/{course.slug} · {course.track} · {course.delivery}
+        {course.track === "consumer" && " · sales page: /enroll/" + course.slug}
       </p>
       {error && <p style={{ fontSize: 13, color: C.hanko, margin: "10px 0 0" }}>{error}</p>}
       <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "14px 0 26px" }}>

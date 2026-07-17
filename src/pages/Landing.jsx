@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "../AuthContext";
 import { C, fontBody, fontDisplay, fontMono } from "../theme";
 import { PENDING_JOIN_KEY } from "./JoinPage";
+import { PENDING_ENROLL_KEY } from "./EnrollPage";
 
 export default function Landing() {
   const { session, profile, profileLoading } = useAuth();
@@ -98,10 +99,16 @@ function Catalog() {
   const [access, setAccess] = useState(isAdmin ? { admin: true } : undefined);
 
   useEffect(() => {
-    // A join link captured before sign-in/profile completes finishes here
+    // A join/enroll link captured before sign-in/profile completes finishes here
     const pending = localStorage.getItem(PENDING_JOIN_KEY);
     if (pending) {
       navigate(`/join/${encodeURIComponent(pending)}`, { replace: true });
+      return;
+    }
+    const pendingEnroll = localStorage.getItem(PENDING_ENROLL_KEY);
+    if (pendingEnroll) {
+      localStorage.removeItem(PENDING_ENROLL_KEY);
+      navigate(`/enroll/${encodeURIComponent(pendingEnroll)}`, { replace: true });
       return;
     }
     // Professional-track exams only — video-course quizzes live on their
