@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { invokeFn, supabase } from "../lib/supabase";
 import { useAuth } from "../AuthContext";
-import { C, fontBody, fontDisplay, fontMono } from "../theme";
+import { C, fontBody, fontDisplay, fontJp, fontMono } from "../theme";
 
 // Setup screen → runner → results, per the prototype flow.
 // All grading, randomization, and timing truth live in the Edge Functions.
@@ -207,6 +207,28 @@ function Runner({ exam, run, onDone }) {
     }
   }
 
+  // practice-mode check for short-answer questions (typed text stays put on
+  // a failed request so it can simply be retried)
+  async function checkShortAnswer() {
+    const q = questions[idx];
+    const text = typeof answers[q.id] === "string" ? answers[q.id].trim() : "";
+    if (!text || feedback[q.id] || checking) return;
+    setChecking(true);
+    setError("");
+    try {
+      const fb = await invokeFn("practice-answer", {
+        attempt_id: run.attempt_id,
+        question_id: q.id,
+        answer: text,
+      });
+      setFeedback((f) => ({ ...f, [q.id]: fb }));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setChecking(false);
+    }
+  }
+
   async function submit() {
     if (submittedRef.current) return;
     submittedRef.current = true;
@@ -231,8 +253,12 @@ function Runner({ exam, run, onDone }) {
   }
 
   const q = questions[idx];
+  const isShort = q.question_type === "short_answer";
   const chosen = answers[q.id];
   const fb = feedback[q.id];
+  const answered = isShort
+    ? typeof chosen === "string" && chosen.trim() !== ""
+    : chosen !== undefined;
   const mm = String(Math.floor((timeLeft ?? 0) / 60)).padStart(2, "0");
   const ss = String((timeLeft ?? 0) % 60).padStart(2, "0");
 
@@ -260,6 +286,41 @@ function Runner({ exam, run, onDone }) {
       {q.image_url && (
         <img src={q.image_url} alt="" style={{ maxWidth: "100%", borderRadius: 4, marginBottom: 20, border: `1px solid ${C.line}` }} />
       )}
+      {isShort ? (
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <input
+            type="text"
+            value={typeof chosen === "string" ? chosen : ""}
+            onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              if (!isCert && !fb) checkShortAnswer();
+              else if (answered && (isCert || fb)) next();
+            }}
+            disabled={checking || submitting || (!isCert && !!fb)}
+            placeholder="Type your answer…"
+            autoComplete="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            style={{
+              flex: "1 1 260px", boxSizing: "border-box", padding: "14px 16px",
+              fontSize: 15, fontFamily: fontBody, color: C.ink, borderRadius: 4,
+              border: `1.5px solid ${fb ? (fb.correct ? C.green : C.hanko) : C.line}`,
+              background: fb ? (fb.correct ? C.greenBg : C.redBg) : C.paper,
+            }}
+          />
+          {!isCert && !fb && (
+            <button
+              onClick={checkShortAnswer}
+              disabled={!answered || checking || submitting}
+              style={{ background: C.indigo, color: "#fff", border: "none", borderRadius: 4, padding: "14px 22px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, opacity: !answered || checking || submitting ? 0.4 : 1 }}
+            >
+              {checking ? "Checking…" : "Check answer"}
+            </button>
+          )}
+        </div>
+      ) : (
       <div style={{ display: "grid", gap: 10 }}>
         {q.options.map((opt, i) => {
           const isChosen = chosen === i;
@@ -284,11 +345,15 @@ function Runner({ exam, run, onDone }) {
           );
         })}
       </div>
+      )}
       {fb && (
         <div style={{ marginTop: 18, background: "#F1EFE7", borderLeft: `3px solid ${fb.correct ? C.green : C.hanko}`, padding: "14px 16px", fontSize: 14, lineHeight: 1.55, color: "#44413A" }}>
           <strong style={{ color: fb.correct ? C.green : C.hanko }}>
             {fb.correct ? "Correct. " : "Not quite. "}
           </strong>
+          {!fb.correct && fb.correct_answer && (
+            <>The answer is <strong>{fb.correct_answer}</strong>. </>
+          )}
           {fb.explanation}
         </div>
       )}
@@ -296,8 +361,8 @@ function Runner({ exam, run, onDone }) {
       <div style={{ marginTop: 26, display: "flex", justifyContent: "flex-end" }}>
         <button
           onClick={next}
-          disabled={chosen === undefined || checking || submitting || (!isCert && !fb)}
-          style={{ background: C.indigoDeep, color: "#fff", border: "none", borderRadius: 3, padding: "12px 28px", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: chosen === undefined || checking || submitting || (!isCert && !fb) ? 0.4 : 1, fontFamily: fontBody }}
+          disabled={!answered || checking || submitting || (!isCert && !fb)}
+          style={{ background: C.indigoDeep, color: "#fff", border: "none", borderRadius: 3, padding: "12px 28px", fontSize: 14, fontWeight: 600, cursor: "pointer", opacity: !answered || checking || submitting || (!isCert && !fb) ? 0.4 : 1, fontFamily: fontBody }}
         >
           {submitting ? "Submitting…" : idx + 1 === questions.length ? "Finish" : "Next question"}
         </button>
@@ -331,7 +396,7 @@ function Result({ exam, result, profile }) {
             className="stamp"
             style={{ position: "absolute", top: -6, right: -110, width: 96, height: 96, border: `3.5px solid ${result.passed ? C.hanko : C.mist}`, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", transform: "rotate(-8deg)", animation: "stamp .45s cubic-bezier(.2,.9,.3,1.2) both", color: result.passed ? C.hanko : C.mist }}
           >
-            <span style={{ fontFamily: fontDisplay, fontWeight: 700, fontSize: result.passed ? 22 : 15, letterSpacing: "0.05em" }}>
+            <span style={{ fontFamily: fontJp, fontWeight: 700, fontSize: result.passed ? 22 : 15, letterSpacing: "0.05em" }}>
               {result.passed ? "合格" : "再挑戦"}
             </span>
           </div>

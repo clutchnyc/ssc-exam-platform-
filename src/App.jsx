@@ -1,7 +1,7 @@
 import { Link, Route, Routes, useNavigate } from "react-router-dom";
 import { isConfigured } from "./lib/supabase";
 import { AuthProvider, useAuth } from "./AuthContext";
-import { C, fontBody, fontDisplay, fontMono } from "./theme";
+import { C, fontBody, fontDisplay, fontMono, logoHorizontal } from "./theme";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import ExamPage from "./pages/ExamPage";
@@ -38,16 +38,15 @@ function Header() {
   return (
     <header
       style={{
-        background: C.indigoDeep, color: C.rice, padding: "14px 24px",
+        background: C.paper, color: C.ink, padding: "12px 24px",
+        borderBottom: `1px solid ${C.line}`,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         flexWrap: "wrap", gap: 8,
       }}
     >
-      <Link to="/" style={{ display: "flex", alignItems: "baseline", gap: 12, textDecoration: "none", color: C.rice }}>
-        <span style={{ fontFamily: fontDisplay, fontSize: 20, fontWeight: 700, letterSpacing: "0.02em" }}>
-          Sake Studies Center
-        </span>
-        <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.18em", color: C.mist }}>
+      <Link to="/" style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: C.ink }}>
+        <img src={logoHorizontal} alt="Sake Studies Center at Brooklyn Kura" style={{ height: 46, width: "auto", display: "block" }} />
+        <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.18em", color: C.mist, borderLeft: `1px solid ${C.line}`, paddingLeft: 14 }}>
           Exam Portal
         </span>
       </Link>
@@ -75,7 +74,7 @@ function Header() {
 }
 
 const headerBtn = {
-  background: "transparent", color: C.rice, border: `1px solid ${C.rice}`,
+  background: C.ink, color: "#fff", border: `1px solid ${C.ink}`,
   borderRadius: 3, padding: "6px 16px", fontSize: 13, fontWeight: 600,
   cursor: "pointer", fontFamily: fontBody,
 };

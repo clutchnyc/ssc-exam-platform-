@@ -52,3 +52,28 @@ export function shuffle<T>(arr: T[]): T[] {
 
 /** Seconds allowed past the time limit for network latency. */
 export const GRACE_SECONDS = 20;
+
+/**
+ * Normalized exact match for short answers (Timothy's locked decision —
+ * no fuzzy matching): lowercase, strip diacritics (kōji → koji), and drop
+ * spaces/hyphens/punctuation. Latin letters, digits, and Japanese
+ * characters survive; everything else is removed.
+ */
+export function normalizeAnswer(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // combining marks left by NFD (macrons etc.)
+    .toLowerCase()
+    .replace(/[^a-z0-9぀-ヿ㐀-鿿]/g, ""); // keep kana + kanji
+}
+
+/** True when a submitted short answer matches any accepted answer. */
+export function shortAnswerCorrect(
+  submitted: unknown,
+  accepted: unknown,
+): boolean {
+  if (typeof submitted !== "string" || !Array.isArray(accepted)) return false;
+  const norm = normalizeAnswer(submitted);
+  if (!norm) return false;
+  return accepted.some((a) => typeof a === "string" && normalizeAnswer(a) === norm);
+}

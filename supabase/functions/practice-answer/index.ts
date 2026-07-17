@@ -1,13 +1,20 @@
 // practice-answer — per-question instant feedback for PRACTICE exams only.
 //
-// Input:  { attempt_id, question_id, answer }   answer = displayed index
-// Output: { correct, correct_index, explanation }
+// Input:  { attempt_id, question_id, answer }
+//         answer = displayed index (mc) | free-text string (short_answer)
+// Output: { correct, correct_index?, correct_answer?, explanation }
 //
 // Lets practice mode show "correct / not quite + explanation" after each
 // question (matching the prototype UX) while still keeping answer keys
 // server-side. Refuses to run for certification attempts.
 
-import { adminClient, corsHeaders, getUser, json } from "../_shared/mod.ts";
+import {
+  adminClient,
+  corsHeaders,
+  getUser,
+  json,
+  shortAnswerCorrect,
+} from "../_shared/mod.ts";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -19,7 +26,10 @@ Deno.serve(async (req) => {
     if (!user) return json({ error: "Not authenticated" }, 401);
 
     const { attempt_id, question_id, answer } = await req.json().catch(() => ({}));
-    if (!attempt_id || !question_id || typeof answer !== "number") {
+    if (
+      !attempt_id || !question_id ||
+      (typeof answer !== "number" && typeof answer !== "string")
+    ) {
       return json({ error: "attempt_id, question_id, answer are required" }, 400);
     }
 
@@ -51,18 +61,30 @@ Deno.serve(async (req) => {
       option_order: number[];
     }[]).find((e) => e.question_id === question_id);
     if (!entry) return json({ error: "Question not in this attempt" }, 400);
+
+    const { data: q } = await db
+      .from("questions")
+      .select("question_type, correct_option, accepted_answers, explanation")
+      .eq("id", question_id)
+      .single();
+
+    if (q.question_type === "short_answer") {
+      if (typeof answer !== "string" || !answer.trim()) {
+        return json({ error: "A text answer is required" }, 400);
+      }
+      return json({
+        correct: shortAnswerCorrect(answer, q.accepted_answers),
+        correct_answer: (q.accepted_answers as string[])[0],
+        explanation: q.explanation,
+      });
+    }
+
     if (
-      !Number.isInteger(answer) || answer < 0 ||
+      typeof answer !== "number" || !Number.isInteger(answer) || answer < 0 ||
       answer >= entry.option_order.length
     ) {
       return json({ error: "Invalid answer index" }, 400);
     }
-
-    const { data: q } = await db
-      .from("questions")
-      .select("correct_option, explanation")
-      .eq("id", question_id)
-      .single();
 
     const original = entry.option_order[answer];
     return json({

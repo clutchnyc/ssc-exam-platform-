@@ -2,11 +2,14 @@
 //
 // Input:  { exam_id }
 // Output: { attempt_id, mode, time_limit_seconds, remaining_seconds,
-//           started_at, resumed, questions: [{ id, prompt, image_url, options }] }
+//           started_at, resumed,
+//           questions: [{ id, prompt, image_url, question_type, options }] }
 //
 // Server-side randomization: the random question subset and per-question
 // option order are chosen HERE and stored on the attempt. Questions are
-// returned WITHOUT correct_option — answer keys never reach the client.
+// returned WITHOUT correct_option/accepted_answers — answer keys never
+// reach the client. Short-answer questions have options: null and an
+// empty option_order.
 
 import {
   adminClient,
@@ -103,7 +106,7 @@ Deno.serve(async (req) => {
     // ——— Draw the randomized question set ———
     const { data: pool } = await db
       .from("questions")
-      .select("id, prompt, options, image_url")
+      .select("id, prompt, options, image_url, question_type")
       .eq("exam_id", exam_id)
       .eq("is_active", true);
     if (!pool || pool.length === 0) {
@@ -117,7 +120,9 @@ Deno.serve(async (req) => {
 
     const question_set: SetEntry[] = drawn.map((q) => ({
       question_id: q.id,
-      option_order: shuffle((q.options as string[]).map((_, i) => i)),
+      option_order: q.question_type === "short_answer"
+        ? []
+        : shuffle((q.options as string[]).map((_, i) => i)),
     }));
 
     const { data: attempt, error: insertErr } = await db
@@ -134,7 +139,10 @@ Deno.serve(async (req) => {
         id: q.id,
         prompt: q.prompt,
         image_url: q.image_url,
-        options: entry.option_order.map((i) => (q.options as string[])[i]),
+        question_type: q.question_type,
+        options: q.question_type === "short_answer"
+          ? null
+          : entry.option_order.map((i) => (q.options as string[])[i]),
       };
     });
 
@@ -161,7 +169,7 @@ async function buildQuestions(
   const ids = questionSet.map((e) => e.question_id);
   const { data: rows } = await db
     .from("questions")
-    .select("id, prompt, options, image_url")
+    .select("id, prompt, options, image_url, question_type")
     .in("id", ids);
   const byId = new Map((rows ?? []).map((q) => [q.id, q]));
   return questionSet.map((entry) => {
@@ -170,7 +178,10 @@ async function buildQuestions(
       id: q.id,
       prompt: q.prompt,
       image_url: q.image_url,
-      options: entry.option_order.map((i) => (q.options as string[])[i]),
+      question_type: q.question_type,
+      options: q.question_type === "short_answer"
+        ? null
+        : entry.option_order.map((i) => (q.options as string[])[i]),
     };
   });
 }

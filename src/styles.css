@@ -1,8 +1,8 @@
 body {
   margin: 0;
-  background: #f6f4ee;
-  color: #1c1b18;
-  font-family: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  background: #f4f1ee; /* C.rice — gray-4 from sakestudiescenter.com */
+  color: #111112; /* C.ink */
+  font-family: "DM Sans", -apple-system, "Segoe UI", sans-serif;
 }
 
 @keyframes stamp {
@@ -16,12 +16,12 @@ body {
 }
 
 .opt:hover:not(:disabled) {
-  border-color: #253c5b !important;
+  border-color: #223661 !important; /* C.indigo */
 }
 
 button:focus-visible,
 .opt:focus-visible,
 input:focus-visible {
-  outline: 2px solid #253c5b;
+  outline: 2px solid #223661;
   outline-offset: 2px;
 }

@@ -1,16 +1,19 @@
 // submit-attempt — grades an attempt server-side and records the result.
 //
-// Input:  { attempt_id, answers }   answers = { [question_id]: displayed_index }
+// Input:  { attempt_id, answers }
+//         answers = { [question_id]: displayed_index (mc) | text (short_answer) }
 // Output: { score_pct, correct_count, total, passed, flagged_late, mode,
-//           results: [{ question_id, correct, correct_index?, explanation? }],
+//           results: [{ question_id, correct, correct_index?, correct_answer?,
+//                       explanation? }],
 //           certificate: { id, verify_code } | null }
 //
-// Displayed indices are mapped back to original option indices via the
+// MC: displayed indices are mapped back to original option indices via the
 // option_order stored with the attempt, then graded against correct_option.
+// Short answer: normalized exact match against accepted_answers.
 // The server clock is truth: submissions beyond time limit + grace are
 // flagged and (for certification) cannot pass.
-// correct_index/explanation are only revealed for PRACTICE exams —
-// certification results show right/wrong per question, not the answers.
+// correct_index/correct_answer/explanation are only revealed for PRACTICE
+// exams — certification results show right/wrong per question, not answers.
 
 import {
   adminClient,
@@ -18,6 +21,7 @@ import {
   getUser,
   GRACE_SECONDS,
   json,
+  shortAnswerCorrect,
 } from "../_shared/mod.ts";
 
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no I/L/O/0/1
@@ -72,38 +76,48 @@ Deno.serve(async (req) => {
     const ids = questionSet.map((e) => e.question_id);
     const { data: qRows } = await db
       .from("questions")
-      .select("id, correct_option, explanation")
+      .select("id, question_type, correct_option, accepted_answers, explanation")
       .in("id", ids);
     const byId = new Map((qRows ?? []).map((q) => [q.id, q]));
 
     const isCert = exam.mode === "certification";
-    const storedAnswers: Record<string, number | null> = {};
+    const storedAnswers: Record<string, number | string | null> = {};
     const results: Record<string, unknown>[] = [];
     let correctCount = 0;
 
     for (const entry of questionSet) {
       const q = byId.get(entry.question_id);
       if (!q) continue;
-      const displayed = answers?.[entry.question_id];
-      const original =
-        typeof displayed === "number" && Number.isInteger(displayed) &&
-          displayed >= 0 && displayed < entry.option_order.length
-          ? entry.option_order[displayed]
-          : null;
-      storedAnswers[entry.question_id] = original;
+      const submitted = answers?.[entry.question_id];
 
-      const correct = original !== null && original === q.correct_option;
-      if (correct) correctCount++;
+      let correct: boolean;
+      const row: Record<string, unknown> = { question_id: entry.question_id };
 
-      const row: Record<string, unknown> = {
-        question_id: entry.question_id,
-        correct,
-      };
-      if (!isCert) {
-        // Practice mode: reveal the right answer (as a display index) + why.
-        row.correct_index = entry.option_order.indexOf(q.correct_option);
-        row.explanation = q.explanation;
+      if (q.question_type === "short_answer") {
+        const text = typeof submitted === "string" ? submitted.trim() : "";
+        storedAnswers[entry.question_id] = text || null;
+        correct = shortAnswerCorrect(text, q.accepted_answers);
+        if (!isCert) {
+          row.correct_answer = (q.accepted_answers as string[])[0];
+          row.explanation = q.explanation;
+        }
+      } else {
+        const original =
+          typeof submitted === "number" && Number.isInteger(submitted) &&
+            submitted >= 0 && submitted < entry.option_order.length
+            ? entry.option_order[submitted]
+            : null;
+        storedAnswers[entry.question_id] = original;
+        correct = original !== null && original === q.correct_option;
+        if (!isCert) {
+          // Practice mode: reveal the right answer (as a display index) + why.
+          row.correct_index = entry.option_order.indexOf(q.correct_option);
+          row.explanation = q.explanation;
+        }
       }
+
+      if (correct) correctCount++;
+      row.correct = correct;
       results.push(row);
     }
 
