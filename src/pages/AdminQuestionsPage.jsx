@@ -606,6 +606,7 @@ export function AdminTabs({ active }) {
       {tab("/admin/questions", "questions", "Questions")}
       {tab("/admin/exams", "exams", "Exams")}
       {tab("/admin/classes", "classes", "Classes")}
+      {tab("/admin/courses", "courses", "Courses")}
     </div>
   );
 }
