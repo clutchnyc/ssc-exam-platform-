@@ -8,6 +8,7 @@ import ExamPage from "./pages/ExamPage";
 import CertificatePage from "./pages/CertificatePage";
 import VerifyPage from "./pages/VerifyPage";
 import AdminPage from "./pages/AdminPage";
+import AdminQuestionsPage from "./pages/AdminQuestionsPage";
 
 export default function App() {
   if (!isConfigured) return <SetupNotice />;
@@ -31,6 +32,7 @@ function Shell() {
           <Route path="/verify" element={<VerifyPage />} />
           <Route path="/verify/:code" element={<VerifyPage />} />
           <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin/questions" element={<AdminQuestionsPage />} />
           <Route path="*" element={<Landing />} />
         </Routes>
       </main>

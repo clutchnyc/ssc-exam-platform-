@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../AuthContext";
 import { C, fontBody, fontDisplay, fontMono } from "../theme";
+import { AdminTabs } from "./AdminQuestionsPage";
 
 // Admin results dashboard — RLS lets admins read every attempt/profile;
 // non-admins get an empty result set server-side either way, but we
@@ -76,6 +77,7 @@ export default function AdminPage() {
 
   return (
     <div>
+      <AdminTabs active="results" />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
         <div>
           <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.2em", color: C.gold, fontWeight: 600, margin: "0 0 6px" }}>Admin</p>
