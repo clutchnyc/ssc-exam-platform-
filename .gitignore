@@ -6,3 +6,4 @@ dist/
 *.log
 supabase/.temp/
 .claude/settings.local.json
+*.csv
