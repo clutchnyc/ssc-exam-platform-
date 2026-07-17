@@ -36,30 +36,6 @@ Deno.serve(async (req) => {
 
     const db = adminClient();
 
-    // ——— Class-enrollment gate (admins bypass) ———
-    // Access requires enrollment in an active class whose window is open.
-    const { data: profileRow } = await db
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (profileRow?.role !== "admin") {
-      const { data: enrollments } = await db
-        .from("enrollments")
-        .select("classes!inner(is_active, expires_at)")
-        .eq("user_id", user.id);
-      const hasAccess = (enrollments ?? []).some((e) => {
-        const c = e.classes as unknown as { is_active: boolean; expires_at: string };
-        return c.is_active && new Date(c.expires_at).getTime() >= Date.now();
-      });
-      if (!hasAccess) {
-        return json(
-          { error: "Exam access requires a class invite link.", code: "not_enrolled" },
-          403,
-        );
-      }
-    }
-
     const { data: exam } = await db
       .from("exams")
       .select("*")
@@ -67,6 +43,77 @@ Deno.serve(async (req) => {
       .eq("is_published", true)
       .maybeSingle();
     if (!exam) return json({ error: "Exam not found" }, 404);
+
+    // ——— Access gate (admins bypass) ———
+    // Video-course exams (consumer track): active course enrollment + every
+    // module complete. Everything else (professional track): enrollment in
+    // an active class whose window is open.
+    const { data: profileRow } = await db
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profileRow?.role !== "admin") {
+      let delivery: string | null = null;
+      if (exam.course_id) {
+        const { data: course } = await db
+          .from("courses")
+          .select("delivery")
+          .eq("id", exam.course_id)
+          .maybeSingle();
+        delivery = course?.delivery ?? null;
+      }
+
+      if (delivery === "video") {
+        const { data: enrollment } = await db
+          .from("course_enrollments")
+          .select("id")
+          .eq("profile_id", user.id)
+          .eq("course_id", exam.course_id)
+          .eq("status", "active")
+          .maybeSingle();
+        if (!enrollment) {
+          return json(
+            { error: "This quiz requires course enrollment.", code: "not_enrolled" },
+            403,
+          );
+        }
+        // Server-side quiz unlock: all modules must be complete.
+        const { data: mods } = await db
+          .from("modules")
+          .select("id")
+          .eq("course_id", exam.course_id);
+        const { data: done } = await db
+          .from("module_progress")
+          .select("module_id")
+          .eq("enrollment_id", enrollment.id)
+          .not("completed_at", "is", null);
+        const doneIds = new Set((done ?? []).map((r) => r.module_id));
+        const allDone = (mods ?? []).length > 0 &&
+          (mods ?? []).every((m) => doneIds.has(m.id));
+        if (!allDone) {
+          return json(
+            { error: "Finish all course modules to unlock the quiz.", code: "modules_incomplete" },
+            403,
+          );
+        }
+      } else {
+        const { data: enrollments } = await db
+          .from("enrollments")
+          .select("classes!inner(is_active, expires_at)")
+          .eq("user_id", user.id);
+        const hasAccess = (enrollments ?? []).some((e) => {
+          const c = e.classes as unknown as { is_active: boolean; expires_at: string };
+          return c.is_active && new Date(c.expires_at).getTime() >= Date.now();
+        });
+        if (!hasAccess) {
+          return json(
+            { error: "Exam access requires a class invite link.", code: "not_enrolled" },
+            403,
+          );
+        }
+      }
+    }
 
     // ——— Resume an open attempt if one exists and time remains ———
     const { data: open } = await db

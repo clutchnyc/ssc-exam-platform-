@@ -140,8 +140,19 @@ Deno.serve(async (req) => {
     if (updateErr) throw updateErr;
 
     // ——— Certificate on passing a certification exam ———
+    // cert_type follows the course track: consumer courses issue the
+    // 'completion' certificate, everything else the professional one.
     let certificate: { id: string; verify_code: string } | null = null;
     if (isCert && passed) {
+      let certType = "professional";
+      if (exam.course_id) {
+        const { data: course } = await db
+          .from("courses")
+          .select("track")
+          .eq("id", exam.course_id)
+          .maybeSingle();
+        if (course?.track === "consumer") certType = "completion";
+      }
       for (let i = 0; i < 5 && !certificate; i++) {
         const { data: cert, error: certErr } = await db
           .from("certificates")
@@ -149,7 +160,7 @@ Deno.serve(async (req) => {
             attempt_id,
             user_id: user.id,
             enrollment_id: attempt.enrollment_id ?? null,
-            cert_type: "professional",
+            cert_type: certType,
             verify_code: makeVerifyCode(),
           })
           .select("id, verify_code")

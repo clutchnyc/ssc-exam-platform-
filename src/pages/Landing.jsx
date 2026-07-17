@@ -93,6 +93,7 @@ function Catalog() {
   const isAdmin = profile?.role === "admin";
   const [exams, setExams] = useState(null);
   const [certs, setCerts] = useState([]);
+  const [courses, setCourses] = useState(null); // enrolled video courses (consumer track)
   // undefined = checking, null = no valid class window, {name, expires_at} = open
   const [access, setAccess] = useState(isAdmin ? { admin: true } : undefined);
 
@@ -114,6 +115,18 @@ function Catalog() {
       .select("verify_code, issued_at, attempts:attempt_id(exams:exam_id(title))")
       .order("issued_at", { ascending: false })
       .then(({ data }) => setCerts(data ?? []));
+    // Consumer track: published video courses this student is enrolled in.
+    supabase
+      .from("course_enrollments")
+      .select("status, courses:course_id(slug, title, delivery, is_published)")
+      .eq("status", "active")
+      .then(({ data }) => {
+        setCourses(
+          (data ?? [])
+            .map((e) => e.courses)
+            .filter((c) => c && c.delivery === "video" && c.is_published),
+        );
+      });
     if (!isAdmin) {
       supabase
         .from("enrollments")
@@ -128,9 +141,9 @@ function Catalog() {
     }
   }, [isAdmin, navigate]);
 
-  if (!exams || access === undefined) return <Loading />;
+  if (!exams || access === undefined || courses === null) return <Loading />;
 
-  if (access === null) {
+  if (access === null && courses.length === 0) {
     // Signed in, but no open class window — the portal is students-only.
     return (
       <div>
@@ -164,20 +177,45 @@ function Catalog() {
     );
   }
 
+  const hasExamAccess = access !== null;
+
   return (
     <div>
       <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.2em", color: C.brandGreen, fontWeight: 600, marginBottom: 8 }}>Assessment</p>
       <h1 style={{ fontFamily: fontDisplay, fontSize: 34, fontWeight: 700, lineHeight: 1.2, margin: "0 0 10px" }}>Test your sake knowledge.</h1>
-      <p style={{ color: C.body, maxWidth: 520, lineHeight: 1.6, marginBottom: access.admin ? 36 : 8 }}>
+      <p style={{ color: C.body, maxWidth: 520, lineHeight: 1.6, marginBottom: !hasExamAccess || access.admin ? 36 : 8 }}>
         Practice freely with instant feedback, or sit the timed certification
         exam. Your results are recorded and a certificate is issued on passing.
       </p>
-      {!access.admin && (
+      {hasExamAccess && !access.admin && (
         <p style={{ fontFamily: fontMono, fontSize: 12, color: C.green, marginBottom: 36 }}>
           {access.name} · exam access until{" "}
           {new Date(access.expires_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
         </p>
       )}
+      {courses.length > 0 && (
+        <div style={{ marginBottom: 36 }}>
+          <h2 style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 700, margin: "0 0 12px" }}>Your courses</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+            {courses.map((course) => (
+              <div key={course.slug} style={{ background: C.paper, border: `1px solid ${C.line}`, borderTop: `3px solid ${C.brandGreen}`, borderRadius: 4, padding: 24, display: "flex", flexDirection: "column" }}>
+                <h2 style={{ fontFamily: fontDisplay, fontSize: 21, fontWeight: 700, margin: "0 0 10px" }}>{course.title}</h2>
+                <p style={{ fontSize: 14, lineHeight: 1.55, color: C.body, flex: 1, margin: "0 0 16px" }}>
+                  Watch the video modules at your own pace, then take the
+                  completion quiz to earn your certificate.
+                </p>
+                <button
+                  onClick={() => navigate(`/course/${course.slug}`)}
+                  style={{ background: C.brandGreen, color: "#fff", border: "none", borderRadius: 0, padding: "11px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
+                >
+                  Go to course
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {!hasExamAccess ? null : (
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
         {exams.map((exam) => {
           const isCert = exam.mode === "certification";
@@ -210,6 +248,7 @@ function Catalog() {
           );
         })}
       </div>
+      )}
       {certs.length > 0 && (
         <div style={{ marginTop: 40 }}>
           <h2 style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 700, margin: "0 0 12px" }}>Your certificates</h2>

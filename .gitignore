@@ -7,3 +7,5 @@ dist/
 supabase/.temp/
 .claude/settings.local.json
 *.csv
+*.mp4
+*.mov

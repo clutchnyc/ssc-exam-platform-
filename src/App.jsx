@@ -5,6 +5,7 @@ import { C, fontBody, fontDisplay, fontMono, logoHorizontal } from "./theme";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import ExamPage from "./pages/ExamPage";
+import CoursePage from "./pages/CoursePage";
 import CertificatePage from "./pages/CertificatePage";
 import VerifyPage from "./pages/VerifyPage";
 import AdminPage from "./pages/AdminPage";
@@ -31,6 +32,7 @@ function Shell() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/exam/:slug" element={<ExamPage />} />
+          <Route path="/course/:slug" element={<CoursePage />} />
           <Route path="/certificate/:code" element={<CertificatePage />} />
           <Route path="/verify" element={<VerifyPage />} />
           <Route path="/verify/:code" element={<VerifyPage />} />
