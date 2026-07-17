@@ -9,6 +9,88 @@ import { C, fontBody, fontDisplay, fontMono } from "../theme";
 // (RLS: admin-only writes, public read). Questions are deactivated rather
 // than deleted so past attempts keep their references.
 
+// ——— CSV helpers ———
+// Columns: type,prompt,options,correct,accepted_answers,explanation,image_url,active
+// options/accepted_answers are pipe-separated; correct is the 1-based option number.
+const CSV_HEADER = ["type", "prompt", "options", "correct", "accepted_answers", "explanation", "image_url", "active"];
+
+function csvEscape(v) {
+  const s = String(v ?? "");
+  return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [], field = "", inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else field += c;
+    } else if (c === '"') inQuotes = true;
+    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(field); field = "";
+      rows.push(row); row = [];
+    } else field += c;
+  }
+  if (field !== "" || row.length) { row.push(field); rows.push(row); }
+  return rows.filter((r) => !(r.length === 1 && r[0].trim() === ""));
+}
+
+/** Parse CSV text into question rows for exam_id; returns { rows, errors }. */
+function csvToQuestions(text, exam_id) {
+  const raw = parseCsv(text);
+  if (raw.length === 0) return { rows: [], errors: ["The file is empty."] };
+
+  // Header row is required so column order mistakes surface immediately.
+  const header = raw[0].map((h) => h.trim().toLowerCase().replace(/\s+/g, "_"));
+  const col = {};
+  for (const name of CSV_HEADER) col[name] = header.indexOf(name);
+  if (col.type === -1 && header.indexOf("question_type") !== -1) col.type = header.indexOf("question_type");
+  if (col.type === -1 || col.prompt === -1) {
+    return { rows: [], errors: [`Header row must include at least "type" and "prompt" (found: ${header.join(", ")}). Export a CSV first to get the template.`] };
+  }
+
+  const rows = [], errors = [];
+  raw.slice(1).forEach((cells, i) => {
+    const line = i + 2; // human line number
+    const get = (name) => (col[name] === -1 ? "" : (cells[col[name]] ?? "").trim());
+    const type = get("type").toLowerCase().replace(/\s|-/g, "_");
+    const prompt = get("prompt");
+    if (!prompt) return errors.push(`Line ${line}: prompt is empty.`);
+
+    const row = {
+      exam_id,
+      prompt,
+      explanation: get("explanation") || null,
+      image_url: get("image_url") || null,
+      is_active: get("active") === "" ? true : ["true", "yes", "1"].includes(get("active").toLowerCase()),
+    };
+
+    if (type === "mc" || type === "multiple_choice") {
+      const options = get("options").split("|").map((o) => o.trim()).filter(Boolean);
+      const correct = parseInt(get("correct"), 10);
+      if (options.length < 2) return errors.push(`Line ${line}: multiple choice needs at least 2 pipe-separated options.`);
+      if (!Number.isInteger(correct) || correct < 1 || correct > options.length) {
+        return errors.push(`Line ${line}: "correct" must be a number from 1 to ${options.length}.`);
+      }
+      Object.assign(row, { question_type: "mc", options, correct_option: correct - 1, accepted_answers: null });
+    } else if (type === "short_answer" || type === "sa") {
+      const answers = get("accepted_answers").split("|").map((a) => a.trim()).filter(Boolean);
+      if (answers.length === 0) return errors.push(`Line ${line}: short answer needs at least one accepted answer (pipe-separated).`);
+      Object.assign(row, { question_type: "short_answer", options: null, correct_option: null, accepted_answers: answers });
+    } else {
+      return errors.push(`Line ${line}: type must be "mc" or "short_answer" (got "${type}").`);
+    }
+    rows.push(row);
+  });
+  return { rows, errors };
+}
+
 const emptyForm = {
   id: null,
   exam_id: "",
@@ -33,6 +115,10 @@ export default function AdminQuestionsPage() {
   const [imageFile, setImageFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importBusy, setImportBusy] = useState(false);
+  const [importMsg, setImportMsg] = useState(null); // { ok, lines: [] }
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -92,6 +178,50 @@ export default function AdminQuestionsPage() {
     });
     setImageFile(null);
     setError("");
+  }
+
+  function exportCsv() {
+    const lines = (questions ?? []).map((q) =>
+      [
+        q.question_type,
+        q.prompt,
+        (q.options ?? []).join("|"),
+        q.question_type === "mc" ? String((q.correct_option ?? 0) + 1) : "",
+        (q.accepted_answers ?? []).join("|"),
+        q.explanation ?? "",
+        q.image_url ?? "",
+        String(q.is_active),
+      ].map(csvEscape).join(","),
+    );
+    const exam = exams.find((e) => e.id === examId);
+    const slug = (exam?.title ?? "questions").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const blob = new Blob([[CSV_HEADER.join(","), ...lines].join("\n")], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${slug}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  async function runImport() {
+    setImportMsg(null);
+    const { rows, errors } = csvToQuestions(importText, examId);
+    if (errors.length) return setImportMsg({ ok: false, lines: errors });
+    if (rows.length === 0) return setImportMsg({ ok: false, lines: ["No question rows found below the header."] });
+    setImportBusy(true);
+    const { error: err } = await supabase.from("questions").insert(rows);
+    setImportBusy(false);
+    if (err) return setImportMsg({ ok: false, lines: [err.message] });
+    setImportMsg({ ok: true, lines: [`Imported ${rows.length} question${rows.length === 1 ? "" : "s"}.`] });
+    setImportText("");
+    loadQuestions();
+  }
+
+  function onImportFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setImportText(String(reader.result ?? ""));
+    reader.readAsText(file);
   }
 
   async function toggleActive(q) {
@@ -349,7 +479,7 @@ export default function AdminQuestionsPage() {
           <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.2em", color: C.gold, fontWeight: 600, margin: "0 0 6px" }}>Admin</p>
           <h1 style={{ fontFamily: fontDisplay, fontSize: 28, fontWeight: 700, margin: 0 }}>Questions</h1>
         </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <select
             value={examId}
             onChange={(e) => setExamId(e.target.value)}
@@ -358,6 +488,19 @@ export default function AdminQuestionsPage() {
             {exams.map((e) => <option key={e.id} value={e.id}>{e.title}</option>)}
           </select>
           <button
+            onClick={exportCsv}
+            disabled={!questions?.length}
+            style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 0, padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, color: C.ink, opacity: questions?.length ? 1 : 0.45 }}
+          >
+            Export CSV
+          </button>
+          <button
+            onClick={() => { setImportOpen((v) => !v); setImportMsg(null); }}
+            style={{ background: "transparent", border: `1px solid ${importOpen ? C.brandGreen : C.line}`, borderRadius: 0, padding: "9px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, color: importOpen ? C.green : C.ink }}
+          >
+            Import CSV
+          </button>
+          <button
             onClick={startNew}
             style={{ background: C.brandGreen, color: "#fff", border: "none", borderRadius: 0, padding: "10px 18px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
           >
@@ -365,6 +508,42 @@ export default function AdminQuestionsPage() {
           </button>
         </div>
       </div>
+
+      {importOpen && (
+        <div style={{ background: C.paper, border: `1px solid ${C.line}`, padding: 18, marginBottom: 20 }}>
+          <p style={{ fontSize: 13, color: C.body, margin: "0 0 10px", lineHeight: 1.55 }}>
+            Imports add new questions to <strong>{exams.find((e) => e.id === examId)?.title}</strong>.
+            Columns: <code style={{ fontFamily: fontMono, fontSize: 12 }}>type, prompt, options, correct, accepted_answers, explanation, image_url, active</code> —
+            separate options and accepted answers with <code style={{ fontFamily: fontMono, fontSize: 12 }}>|</code>, and
+            "correct" is the option number (1 = first). Use <strong>Export CSV</strong> to get a filled-in template.
+          </p>
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(e) => onImportFile(e.target.files?.[0])}
+            style={{ fontSize: 13, fontFamily: fontBody, marginBottom: 10, display: "block" }}
+          />
+          <textarea
+            value={importText}
+            onChange={(e) => setImportText(e.target.value)}
+            rows={5}
+            placeholder={"…or paste CSV here\ntype,prompt,options,correct,accepted_answers,explanation,image_url,active\nmc,Which rice is king?,Yamada Nishiki|Omachi|Gohyakumangoku,1,,Yamada Nishiki is…,,true"}
+            style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", fontSize: 12.5, fontFamily: fontMono, border: `1px solid ${C.line}`, borderRadius: 0, background: C.rice, color: C.ink, resize: "vertical" }}
+          />
+          {importMsg && (
+            <div style={{ marginTop: 10, fontSize: 13, color: importMsg.ok ? C.green : C.hanko, lineHeight: 1.6 }}>
+              {importMsg.lines.map((l, i) => <div key={i}>{l}</div>)}
+            </div>
+          )}
+          <button
+            onClick={runImport}
+            disabled={importBusy || !importText.trim()}
+            style={{ marginTop: 12, background: C.brandGreen, color: "#fff", border: "none", borderRadius: 0, padding: "10px 22px", fontSize: 13.5, fontWeight: 600, cursor: "pointer", fontFamily: fontBody, opacity: importBusy || !importText.trim() ? 0.45 : 1 }}
+          >
+            {importBusy ? "Importing…" : "Import questions"}
+          </button>
+        </div>
+      )}
 
       {error && <p style={{ fontSize: 13, color: C.hanko, marginBottom: 12 }}>{error}</p>}
 
@@ -425,6 +604,7 @@ export function AdminTabs({ active }) {
     <div style={{ display: "flex", gap: 8, marginBottom: 26 }}>
       {tab("/admin", "results", "Results")}
       {tab("/admin/questions", "questions", "Questions")}
+      {tab("/admin/exams", "exams", "Exams")}
     </div>
   );
 }

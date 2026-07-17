@@ -9,6 +9,7 @@ import CertificatePage from "./pages/CertificatePage";
 import VerifyPage from "./pages/VerifyPage";
 import AdminPage from "./pages/AdminPage";
 import AdminQuestionsPage from "./pages/AdminQuestionsPage";
+import AdminExamsPage from "./pages/AdminExamsPage";
 
 export default function App() {
   if (!isConfigured) return <SetupNotice />;
@@ -33,6 +34,7 @@ function Shell() {
           <Route path="/verify/:code" element={<VerifyPage />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/admin/questions" element={<AdminQuestionsPage />} />
+          <Route path="/admin/exams" element={<AdminExamsPage />} />
           <Route path="*" element={<Landing />} />
         </Routes>
       </main>
