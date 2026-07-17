@@ -28,5 +28,10 @@ export const fontMono = "'IBM Plex Mono', 'SFMono-Regular', monospace";
 // Japanese accents only (合格 / 再挑戦 stamp) — DM Sans has no JP glyphs
 export const fontJp = "'Shippori Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif";
 
+// Certificate overlays — Adobe Fonts kit lbk1kls (Timothy's diploma types).
+// Acumin Pro stands in for Acumin Variable Concept (desktop-only release).
+export const fontCertLabel = "'acumin-pro', 'DM Sans', sans-serif";
+export const fontCertName = "'ivypresto-display', 'Georgia', serif";
+
 export const logoHorizontal = new URL("./assets/ssc-logo-horizontal.png", import.meta.url).href;
 export const logoMark = new URL("./assets/ssc-mark-256.png", import.meta.url).href;

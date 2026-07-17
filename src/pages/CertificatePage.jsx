@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../AuthContext";
-import { C, fontBody, fontMono } from "../theme";
+import { C, fontBody, fontCertLabel, fontCertName, fontMono } from "../theme";
 
 // Timothy's designed diploma (DIPLOMAS/blank diploma.pdf, rasterized at
 // 2400px). Dynamic fields are overlaid at percentages of the sheet; font
@@ -20,11 +20,13 @@ export default function CertificatePage() {
 
   useEffect(() => {
     if (isPreview) {
+      // ?name= lets us try different name lengths while tuning the layout
+      const mockName = new URLSearchParams(window.location.search).get("name");
       setCert({
         verify_code: "SSC-2026-QK7M3",
         issued_at: new Date().toISOString(),
         attempts: { score_pct: 92, exams: { title: "Sake Server Certification", pass_pct: 80 } },
-        profiles: { full_name: "Alexandra Yamamoto-Rodriguez" },
+        profiles: { full_name: mockName || "Alexandra Yamamoto-Rodriguez" },
       });
       return;
     }
@@ -61,10 +63,11 @@ export default function CertificatePage() {
 
   const issued = new Date(cert.issued_at).toLocaleDateString("en-US", {
     year: "numeric", month: "long", day: "numeric",
-  });
+  }).toUpperCase();
   const name = cert.profiles.full_name;
-  // Long names shrink so they stay inside the awarded-to zone
-  const nameSize = name.length > 26 ? 4.2 : name.length > 18 ? 5 : 5.8; // cqw
+  // Continuous fit: size tracks name length so any name fills the
+  // awarded-to zone on a single line (IvyPresto avg glyph ≈ 0.5em).
+  const nameSize = Math.max(2.6, Math.min(6.2, 108 / name.length)); // cqw
 
   return (
     <div>
@@ -74,15 +77,17 @@ export default function CertificatePage() {
           alt=""
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "block" }}
         />
-        {/* Date — sits in the DATE band, right of the label */}
-        <div style={{ position: "absolute", left: "19.5%", top: "31.2%", width: "37%", height: "4.5%", display: "flex", alignItems: "center" }}>
-          <span style={{ fontFamily: fontBody, fontWeight: 600, fontSize: "1.9cqw", letterSpacing: "0.06em", color: C.ink }}>
-            {issued}
-          </span>
+        {/* Date — Acumin caps, characters justified to fill the DATE band */}
+        <div style={{ position: "absolute", left: "20%", top: "31.2%", width: "33%", height: "4.5%", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          {issued.split("").map((ch, i) => (
+            <span key={i} style={{ fontFamily: fontCertLabel, fontWeight: 500, fontSize: "1.8cqw", color: C.ink, whiteSpace: "pre" }}>
+              {ch}
+            </span>
+          ))}
         </div>
-        {/* Student name — the awarded-to zone, SSC green */}
-        <div style={{ position: "absolute", left: "27%", top: "38.5%", width: "63.5%", height: "20%", display: "flex", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
-          <span style={{ fontFamily: fontBody, fontWeight: 700, fontSize: `${nameSize}cqw`, lineHeight: 1.1, color: C.brandGreen }}>
+        {/* Student name — IvyPresto Display, SSC green, sized to fit */}
+        <div style={{ position: "absolute", left: "27%", top: "38.5%", width: "63.5%", height: "20%", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <span style={{ fontFamily: fontCertName, fontWeight: 400, fontSize: `${nameSize}cqw`, lineHeight: 1.05, color: C.brandGreen, whiteSpace: "nowrap" }}>
             {name}
           </span>
         </div>
