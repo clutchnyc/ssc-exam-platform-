@@ -1,7 +1,8 @@
-// get-playback-token — mints a short-lived signed Bunny Stream embed URL.
+// get-playback-token — mints a short-lived signed Bunny Stream embed URL,
+// plus a signed download URL for the module's attached resource (if any).
 //
 // Input:  { module_id }
-// Output: { embed_url, expires }
+// Output: { embed_url, expires, resource_url, resource_name }
 //
 // The client never sees a permanent playback link: access is re-checked
 // here on every request (active course_enrollment on the module's
@@ -44,7 +45,7 @@ Deno.serve(async (req) => {
 
     const { data: module } = await db
       .from("modules")
-      .select("id, video_ref, video_provider, courses:course_id(id, is_published)")
+      .select("id, video_ref, video_provider, resource_path, resource_name, courses:course_id(id, is_published)")
       .eq("id", module_id)
       .maybeSingle();
     if (!module || !module.video_ref) {
@@ -88,7 +89,24 @@ Deno.serve(async (req) => {
       `https://iframe.mediadelivery.net/embed/${libraryId}/${module.video_ref}` +
       `?token=${token}&expires=${expires}&autoplay=false`;
 
-    return json({ embed_url, expires });
+    // Attached resource (PDF handout): signed URL from the private bucket,
+    // same TTL as playback. download param sets the saved filename.
+    let resource_url: string | null = null;
+    if (module.resource_path) {
+      const { data: signed } = await db.storage
+        .from("course-materials")
+        .createSignedUrl(module.resource_path, TOKEN_TTL_SECONDS, {
+          download: module.resource_name ?? true,
+        });
+      resource_url = signed?.signedUrl ?? null;
+    }
+
+    return json({
+      embed_url,
+      expires,
+      resource_url,
+      resource_name: module.resource_name ?? null,
+    });
   } catch (err) {
     console.error("get-playback-token error:", err);
     return json({ error: "Internal error" }, 500);

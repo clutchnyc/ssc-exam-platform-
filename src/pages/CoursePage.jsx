@@ -23,6 +23,7 @@ export default function CoursePage() {
   const [quiz, setQuiz] = useState(null); // published exam attached to this course
   const [active, setActive] = useState(null); // module being played
   const [embedUrl, setEmbedUrl] = useState(null);
+  const [resource, setResource] = useState(null); // {url, name} signed download
   const [playerError, setPlayerError] = useState("");
   const [marking, setMarking] = useState(false);
 
@@ -44,7 +45,7 @@ export default function CoursePage() {
     if (!course) return;
     supabase
       .from("modules")
-      .select("id, title, sort_order, duration_sec")
+      .select("id, title, description, sort_order, duration_sec")
       .eq("course_id", course.id)
       .order("sort_order")
       .then(({ data }) => setModules(data ?? []));
@@ -129,11 +130,13 @@ export default function CoursePage() {
   async function openModule(mod) {
     setPlayerError("");
     setEmbedUrl(null);
+    setResource(null);
     setActive(mod);
     maxSecondsRef.current = progress[mod.id]?.watch_seconds ?? 0;
     try {
-      const { embed_url } = await invokeFn("get-playback-token", { module_id: mod.id });
-      setEmbedUrl(embed_url);
+      const res = await invokeFn("get-playback-token", { module_id: mod.id });
+      setEmbedUrl(res.embed_url);
+      if (res.resource_url) setResource({ url: res.resource_url, name: res.resource_name });
     } catch (err) {
       setPlayerError(err.message || "Could not load the video.");
     }
@@ -205,18 +208,33 @@ export default function CoursePage() {
                   </p>
                 )}
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "14px 18px" }}>
-                <h2 style={{ fontFamily: fontDisplay, fontSize: 17, fontWeight: 700, margin: 0 }}>{active.title}</h2>
-                {progress[active.id]?.completed ? (
-                  <span style={{ fontFamily: fontMono, fontSize: 12, color: C.green, whiteSpace: "nowrap" }}>✓ Complete</span>
-                ) : (
-                  <button
-                    onClick={markComplete}
-                    disabled={marking}
-                    style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 0, padding: "8px 14px", fontSize: 12.5, cursor: "pointer", fontFamily: fontBody, color: C.ink, whiteSpace: "nowrap", opacity: marking ? 0.5 : 1 }}
+              <div style={{ padding: "14px 18px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                  <h2 style={{ fontFamily: fontDisplay, fontSize: 17, fontWeight: 700, margin: 0 }}>{active.title}</h2>
+                  {progress[active.id]?.completed ? (
+                    <span style={{ fontFamily: fontMono, fontSize: 12, color: C.green, whiteSpace: "nowrap" }}>✓ Complete</span>
+                  ) : (
+                    <button
+                      onClick={markComplete}
+                      disabled={marking}
+                      style={{ background: "transparent", border: `1px solid ${C.line}`, borderRadius: 0, padding: "8px 14px", fontSize: 12.5, cursor: "pointer", fontFamily: fontBody, color: C.ink, whiteSpace: "nowrap", opacity: marking ? 0.5 : 1 }}
+                    >
+                      {marking ? "Saving…" : "Mark complete"}
+                    </button>
+                  )}
+                </div>
+                {active.description && (
+                  <p style={{ fontSize: 14, color: C.body, lineHeight: 1.6, margin: "10px 0 0", whiteSpace: "pre-wrap" }}>
+                    {active.description}
+                  </p>
+                )}
+                {resource && (
+                  <a
+                    href={resource.url}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 8, marginTop: 12, border: `1px solid ${C.line}`, borderLeft: `3px solid ${C.gold}`, padding: "9px 14px", fontSize: 13.5, fontWeight: 600, textDecoration: "none", color: C.ink, fontFamily: fontBody }}
                   >
-                    {marking ? "Saving…" : "Mark complete"}
-                  </button>
+                    📄 Download: {resource.name ?? "course material"}
+                  </a>
                 )}
               </div>
             </>

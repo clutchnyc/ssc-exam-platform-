@@ -27,6 +27,22 @@ const btnGhost = {
   padding: "8px 14px", fontSize: 12.5, cursor: "pointer", fontFamily: fontBody, color: C.ink,
 };
 
+/** Upload a handout to the private course-materials bucket. */
+async function uploadResource(courseId, file) {
+  const safe = file.name.replace(/[^A-Za-z0-9._-]+/g, "_");
+  const path = `${courseId}/${Date.now()}-${safe}`;
+  const { error } = await supabase.storage
+    .from("course-materials")
+    .upload(path, file, { contentType: file.type || "application/pdf" });
+  if (error) throw new Error(`Upload failed: ${error.message}`);
+  return { path, name: file.name };
+}
+
+/** Best-effort delete of a replaced/removed handout. */
+function removeResourceQuietly(path) {
+  if (path) supabase.storage.from("course-materials").remove([path]);
+}
+
 export default function AdminCoursesPage() {
   const { session, profile, profileLoading } = useAuth();
   const isAdmin = profile?.role === "admin";
@@ -246,19 +262,15 @@ function CourseEditor({ course, onChanged }) {
       ) : (
         <div style={{ display: "grid", gap: 8, marginBottom: 22 }}>
           {modules.map((mod, i) => (
-            <div key={mod.id} style={{ display: "flex", alignItems: "center", gap: 12, border: `1px solid ${C.line}`, padding: "11px 14px", flexWrap: "wrap" }}>
-              <span style={{ fontFamily: fontMono, fontSize: 12, color: C.mist, minWidth: 18 }}>{i + 1}</span>
-              <span style={{ flex: 1, fontSize: 14, fontWeight: 600, minWidth: 160 }}>{mod.title}</span>
-              <span style={{ fontFamily: fontMono, fontSize: 11.5, color: C.mist }}>
-                {mod.video_ref ? `${mod.video_ref.slice(0, 8)}…` : "no video"}
-                {mod.duration_sec != null && ` · ${Math.floor(mod.duration_sec / 60)}:${String(mod.duration_sec % 60).padStart(2, "0")}`}
-              </span>
-              <span style={{ display: "flex", gap: 6 }}>
-                <button onClick={() => move(mod, -1)} disabled={i === 0} style={{ ...btnGhost, padding: "5px 10px", opacity: i === 0 ? 0.35 : 1 }}>↑</button>
-                <button onClick={() => move(mod, 1)} disabled={i === modules.length - 1} style={{ ...btnGhost, padding: "5px 10px", opacity: i === modules.length - 1 ? 0.35 : 1 }}>↓</button>
-                <button onClick={() => remove(mod)} style={{ ...btnGhost, padding: "5px 10px", color: C.hanko, borderColor: C.hanko }}>Delete</button>
-              </span>
-            </div>
+            <ModuleRow
+              key={mod.id}
+              mod={mod}
+              index={i}
+              total={modules.length}
+              onMove={move}
+              onRemove={remove}
+              onSaved={loadModules}
+            />
           ))}
           {modules.length === 0 && (
             <p style={{ fontSize: 13.5, color: C.mist, margin: 0 }}>No modules yet — add the first one below.</p>
@@ -275,9 +287,107 @@ function CourseEditor({ course, onChanged }) {
   );
 }
 
+function ModuleRow({ mod, index, total, onMove, onRemove, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState(mod.title);
+  const [description, setDescription] = useState(mod.description ?? "");
+  const [file, setFile] = useState(null); // replacement/new handout
+  const [dropResource, setDropResource] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    if (!title.trim()) return setError("Title is required.");
+    setSaving(true);
+    setError("");
+    try {
+      const fields = { title: title.trim(), description: description.trim() || null };
+      if (file) {
+        const up = await uploadResource(mod.course_id, file);
+        fields.resource_path = up.path;
+        fields.resource_name = up.name;
+      } else if (dropResource) {
+        fields.resource_path = null;
+        fields.resource_name = null;
+      }
+      const { error: err } = await supabase.from("modules").update(fields).eq("id", mod.id);
+      if (err) throw new Error(err.message);
+      if ((file || dropResource) && mod.resource_path) removeResourceQuietly(mod.resource_path);
+      setEditing(false);
+      setFile(null);
+      setDropResource(false);
+      onSaved();
+    } catch (err) {
+      setError(err.message);
+    }
+    setSaving(false);
+  }
+
+  return (
+    <div style={{ border: `1px solid ${C.line}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 14px", flexWrap: "wrap" }}>
+        <span style={{ fontFamily: fontMono, fontSize: 12, color: C.mist, minWidth: 18 }}>{index + 1}</span>
+        <span style={{ flex: 1, fontSize: 14, fontWeight: 600, minWidth: 160 }}>
+          {mod.title}
+          {mod.resource_name && <span style={{ fontFamily: fontMono, fontSize: 11, color: C.gold, marginLeft: 8 }}>📄</span>}
+        </span>
+        <span style={{ fontFamily: fontMono, fontSize: 11.5, color: C.mist }}>
+          {mod.video_ref ? `${mod.video_ref.slice(0, 8)}…` : "no video"}
+          {mod.duration_sec != null && ` · ${Math.floor(mod.duration_sec / 60)}:${String(mod.duration_sec % 60).padStart(2, "0")}`}
+        </span>
+        <span style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => onMove(mod, -1)} disabled={index === 0} style={{ ...btnGhost, padding: "5px 10px", opacity: index === 0 ? 0.35 : 1 }}>↑</button>
+          <button onClick={() => onMove(mod, 1)} disabled={index === total - 1} style={{ ...btnGhost, padding: "5px 10px", opacity: index === total - 1 ? 0.35 : 1 }}>↓</button>
+          <button onClick={() => setEditing((v) => !v)} style={{ ...btnGhost, padding: "5px 10px" }}>{editing ? "Close" : "Edit"}</button>
+          <button onClick={() => onRemove(mod)} style={{ ...btnGhost, padding: "5px 10px", color: C.hanko, borderColor: C.hanko }}>Delete</button>
+        </span>
+      </div>
+
+      {editing && (
+        <div style={{ borderTop: `1px solid ${C.line}`, padding: "14px 14px 16px", background: C.rice }}>
+          <label style={labelStyle}>Module title</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} style={{ ...inputStyle, marginBottom: 12 }} />
+          <label style={labelStyle}>Description (shown under the player)</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            placeholder="What this module covers…"
+            style={{ ...inputStyle, resize: "vertical", marginBottom: 12 }}
+          />
+          <label style={labelStyle}>Downloadable handout (PDF)</label>
+          {mod.resource_name && !file && !dropResource ? (
+            <p style={{ fontSize: 13.5, margin: "0 0 10px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <span>📄 {mod.resource_name}</span>
+              <button onClick={() => setDropResource(true)} style={{ ...btnGhost, padding: "4px 10px", fontSize: 12, color: C.hanko, borderColor: C.hanko }}>Remove</button>
+            </p>
+          ) : dropResource && !file ? (
+            <p style={{ fontSize: 13, color: C.hanko, margin: "0 0 10px" }}>
+              Handout will be removed on save.{" "}
+              <button onClick={() => setDropResource(false)} style={{ ...btnGhost, padding: "3px 8px", fontSize: 12 }}>Keep it</button>
+            </p>
+          ) : null}
+          <input
+            type="file"
+            accept=".pdf,application/pdf"
+            onChange={(e) => { setFile(e.target.files?.[0] ?? null); setDropResource(false); }}
+            style={{ fontSize: 13, marginBottom: 12, fontFamily: fontBody }}
+          />
+          {error && <p style={{ fontSize: 13, color: C.hanko, margin: "0 0 10px" }}>{error}</p>}
+          <button onClick={save} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.5 : 1 }}>
+            {saving ? "Saving…" : "Save module"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AddModule({ courseId, nextSort, onAdded }) {
   const [guid, setGuid] = useState("");
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [file, setFile] = useState(null);
   const [duration, setDuration] = useState("");
   const [looking, setLooking] = useState(false);
   const [looked, setLooked] = useState(false); // GUID validated against Bunny
@@ -313,18 +423,32 @@ function AddModule({ courseId, nextSort, onAdded }) {
     if (dur !== null && (!Number.isInteger(dur) || dur < 1)) return setError("Duration must be seconds (or blank).");
     setSaving(true);
     setError("");
-    const { error: err } = await supabase.from("modules").insert({
-      course_id: courseId,
-      sort_order: nextSort,
-      title: t,
-      video_provider: "bunny",
-      video_ref: g,
-      duration_sec: dur,
-    });
+    try {
+      let resource_path = null;
+      let resource_name = null;
+      if (file) {
+        const up = await uploadResource(courseId, file);
+        resource_path = up.path;
+        resource_name = up.name;
+      }
+      const { error: err } = await supabase.from("modules").insert({
+        course_id: courseId,
+        sort_order: nextSort,
+        title: t,
+        description: description.trim() || null,
+        video_provider: "bunny",
+        video_ref: g,
+        duration_sec: dur,
+        resource_path,
+        resource_name,
+      });
+      if (err) throw new Error(err.message);
+      setGuid(""); setTitle(""); setDescription(""); setFile(null); setDuration(""); setLooked(false); setNotice("");
+      onAdded();
+    } catch (err) {
+      setError(err.message);
+    }
     setSaving(false);
-    if (err) return setError(err.message);
-    setGuid(""); setTitle(""); setDuration(""); setLooked(false); setNotice("");
-    onAdded();
   }
 
   return (
@@ -357,6 +481,21 @@ function AddModule({ courseId, nextSort, onAdded }) {
           <input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="auto" style={inputStyle} />
         </div>
       </div>
+      <label style={labelStyle}>Description (shown under the player)</label>
+      <textarea
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        rows={3}
+        placeholder="What this module covers…"
+        style={{ ...inputStyle, resize: "vertical", marginBottom: 12 }}
+      />
+      <label style={labelStyle}>Downloadable handout (PDF, optional)</label>
+      <input
+        type="file"
+        accept=".pdf,application/pdf"
+        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        style={{ fontSize: 13, marginBottom: 12, fontFamily: fontBody, display: "block" }}
+      />
       {error && <p style={{ fontSize: 13, color: C.hanko, margin: "0 0 12px" }}>{error}</p>}
       <button onClick={add} disabled={saving} style={{ ...btnPrimary, opacity: saving ? 0.5 : 1 }}>
         {saving ? "Adding…" : "Add module"}
