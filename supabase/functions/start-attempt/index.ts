@@ -36,6 +36,30 @@ Deno.serve(async (req) => {
 
     const db = adminClient();
 
+    // ——— Class-enrollment gate (admins bypass) ———
+    // Access requires enrollment in an active class whose window is open.
+    const { data: profileRow } = await db
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (profileRow?.role !== "admin") {
+      const { data: enrollments } = await db
+        .from("enrollments")
+        .select("classes!inner(is_active, expires_at)")
+        .eq("user_id", user.id);
+      const hasAccess = (enrollments ?? []).some((e) => {
+        const c = e.classes as unknown as { is_active: boolean; expires_at: string };
+        return c.is_active && new Date(c.expires_at).getTime() >= Date.now();
+      });
+      if (!hasAccess) {
+        return json(
+          { error: "Exam access requires a class invite link.", code: "not_enrolled" },
+          403,
+        );
+      }
+    }
+
     const { data: exam } = await db
       .from("exams")
       .select("*")

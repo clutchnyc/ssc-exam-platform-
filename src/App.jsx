@@ -10,6 +10,8 @@ import VerifyPage from "./pages/VerifyPage";
 import AdminPage from "./pages/AdminPage";
 import AdminQuestionsPage from "./pages/AdminQuestionsPage";
 import AdminExamsPage from "./pages/AdminExamsPage";
+import AdminClassesPage from "./pages/AdminClassesPage";
+import JoinPage from "./pages/JoinPage";
 
 export default function App() {
   if (!isConfigured) return <SetupNotice />;
@@ -35,6 +37,8 @@ function Shell() {
           <Route path="/admin" element={<AdminPage />} />
           <Route path="/admin/questions" element={<AdminQuestionsPage />} />
           <Route path="/admin/exams" element={<AdminExamsPage />} />
+          <Route path="/admin/classes" element={<AdminClassesPage />} />
+          <Route path="/join/:code" element={<JoinPage />} />
           <Route path="*" element={<Landing />} />
         </Routes>
       </main>

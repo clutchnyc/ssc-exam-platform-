@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../AuthContext";
 import { C, fontBody, fontDisplay, fontMono } from "../theme";
+import { PENDING_JOIN_KEY } from "./JoinPage";
 
 export default function Landing() {
   const { session, profile, profileLoading } = useAuth();
@@ -88,10 +89,20 @@ function CompleteProfile() {
 
 function Catalog() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
   const [exams, setExams] = useState(null);
   const [certs, setCerts] = useState([]);
+  // undefined = checking, null = no valid class window, {name, expires_at} = open
+  const [access, setAccess] = useState(isAdmin ? { admin: true } : undefined);
 
   useEffect(() => {
+    // A join link captured before sign-in/profile completes finishes here
+    const pending = localStorage.getItem(PENDING_JOIN_KEY);
+    if (pending) {
+      navigate(`/join/${encodeURIComponent(pending)}`, { replace: true });
+      return;
+    }
     supabase
       .from("exams")
       .select("*")
@@ -103,18 +114,70 @@ function Catalog() {
       .select("verify_code, issued_at, attempts:attempt_id(exams:exam_id(title))")
       .order("issued_at", { ascending: false })
       .then(({ data }) => setCerts(data ?? []));
-  }, []);
+    if (!isAdmin) {
+      supabase
+        .from("enrollments")
+        .select("classes(name, expires_at, is_active)")
+        .then(({ data }) => {
+          const open = (data ?? [])
+            .map((e) => e.classes)
+            .filter((c) => c && c.is_active && new Date(c.expires_at).getTime() >= Date.now())
+            .sort((a, b) => new Date(b.expires_at) - new Date(a.expires_at));
+          setAccess(open[0] ?? null);
+        });
+    }
+  }, [isAdmin, navigate]);
 
-  if (!exams) return <Loading />;
+  if (!exams || access === undefined) return <Loading />;
+
+  if (access === null) {
+    // Signed in, but no open class window — the portal is students-only.
+    return (
+      <div>
+        <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderTop: `3px solid ${C.brandGreen}`, padding: 32, maxWidth: 520, margin: "20px auto 0", textAlign: "center" }}>
+          <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.2em", color: C.brandGreen, fontWeight: 600, margin: "0 0 10px" }}>Students only</p>
+          <h1 style={{ fontFamily: fontDisplay, fontSize: 26, fontWeight: 700, margin: "0 0 10px" }}>Your class link unlocks the exams.</h1>
+          <p style={{ fontSize: 14.5, color: C.body, lineHeight: 1.65, margin: 0 }}>
+            Exams are open to Sake Studies Center students for two weeks after
+            their class. Use the personal class link from your follow-up email —
+            or contact us if yours has expired or gone missing.
+          </p>
+        </div>
+        {certs.length > 0 && (
+          <div style={{ maxWidth: 520, margin: "28px auto 0" }}>
+            <h2 style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 700, margin: "0 0 12px" }}>Your certificates</h2>
+            <div style={{ display: "grid", gap: 8 }}>
+              {certs.map((cert) => (
+                <Link
+                  key={cert.verify_code}
+                  to={`/certificate/${cert.verify_code}`}
+                  style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", background: C.paper, border: `1px solid ${C.line}`, borderLeft: `3px solid ${C.gold}`, padding: "13px 16px", textDecoration: "none", color: C.ink }}
+                >
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>{cert.attempts.exams.title}</span>
+                  <span style={{ fontFamily: fontMono, fontSize: 12, color: C.mist }}>{cert.verify_code}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
       <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.2em", color: C.brandGreen, fontWeight: 600, marginBottom: 8 }}>Assessment</p>
       <h1 style={{ fontFamily: fontDisplay, fontSize: 34, fontWeight: 700, lineHeight: 1.2, margin: "0 0 10px" }}>Test your sake knowledge.</h1>
-      <p style={{ color: C.body, maxWidth: 520, lineHeight: 1.6, marginBottom: 36 }}>
+      <p style={{ color: C.body, maxWidth: 520, lineHeight: 1.6, marginBottom: access.admin ? 36 : 8 }}>
         Practice freely with instant feedback, or sit the timed certification
         exam. Your results are recorded and a certificate is issued on passing.
       </p>
+      {!access.admin && (
+        <p style={{ fontFamily: fontMono, fontSize: 12, color: C.green, marginBottom: 36 }}>
+          {access.name} · exam access until{" "}
+          {new Date(access.expires_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
+        </p>
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
         {exams.map((exam) => {
           const isCert = exam.mode === "certification";
