@@ -89,6 +89,7 @@ function CompleteProfile() {
 function Catalog() {
   const navigate = useNavigate();
   const [exams, setExams] = useState(null);
+  const [certs, setCerts] = useState([]);
 
   useEffect(() => {
     supabase
@@ -97,6 +98,11 @@ function Catalog() {
       .eq("is_published", true)
       .order("mode", { ascending: false }) // practice first
       .then(({ data }) => setExams(data ?? []));
+    supabase
+      .from("certificates")
+      .select("verify_code, issued_at, attempts:attempt_id(exams:exam_id(title))")
+      .order("issued_at", { ascending: false })
+      .then(({ data }) => setCerts(data ?? []));
   }, []);
 
   if (!exams) return <Loading />;
@@ -141,6 +147,25 @@ function Catalog() {
           );
         })}
       </div>
+      {certs.length > 0 && (
+        <div style={{ marginTop: 40 }}>
+          <h2 style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 700, margin: "0 0 12px" }}>Your certificates</h2>
+          <div style={{ display: "grid", gap: 8 }}>
+            {certs.map((cert) => (
+              <Link
+                key={cert.verify_code}
+                to={`/certificate/${cert.verify_code}`}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", background: C.paper, border: `1px solid ${C.line}`, borderLeft: `3px solid ${C.gold}`, borderRadius: 4, padding: "13px 16px", textDecoration: "none", color: C.ink }}
+              >
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{cert.attempts.exams.title}</span>
+                <span style={{ fontFamily: fontMono, fontSize: 12, color: C.mist }}>
+                  {cert.verify_code} · {new Date(cert.issued_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -5,6 +5,9 @@ import { C, fontBody, fontDisplay, fontMono, logoHorizontal } from "./theme";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import ExamPage from "./pages/ExamPage";
+import CertificatePage from "./pages/CertificatePage";
+import VerifyPage from "./pages/VerifyPage";
+import AdminPage from "./pages/AdminPage";
 
 export default function App() {
   if (!isConfigured) return <SetupNotice />;
@@ -24,6 +27,10 @@ function Shell() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/exam/:slug" element={<ExamPage />} />
+          <Route path="/certificate/:code" element={<CertificatePage />} />
+          <Route path="/verify" element={<VerifyPage />} />
+          <Route path="/verify/:code" element={<VerifyPage />} />
+          <Route path="/admin" element={<AdminPage />} />
           <Route path="*" element={<Landing />} />
         </Routes>
       </main>
@@ -37,6 +44,7 @@ function Header() {
 
   return (
     <header
+      className="no-print"
       style={{
         background: C.paper, color: C.ink, padding: "12px 24px",
         borderBottom: `1px solid ${C.line}`,
@@ -53,6 +61,11 @@ function Header() {
       <nav style={{ display: "flex", gap: 12, alignItems: "center" }}>
         {session ? (
           <>
+            {profile?.role === "admin" && (
+              <Link to="/admin" style={{ fontSize: 13, fontWeight: 600, color: C.indigo, textDecoration: "none" }}>
+                Admin
+              </Link>
+            )}
             {profile && (
               <span style={{ fontFamily: fontMono, fontSize: 12, color: C.mist }}>{profile.full_name}</span>
             )}

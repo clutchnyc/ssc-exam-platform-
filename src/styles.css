@@ -25,3 +25,15 @@ input:focus-visible {
   outline: 2px solid #223661;
   outline-offset: 2px;
 }
+
+/* Certificate printing: just the sheet, edge to edge on white */
+@media print {
+  .no-print { display: none !important; }
+  body { background: #fff; }
+  main { max-width: none !important; padding: 0 !important; margin: 0 !important; }
+  .cert-sheet {
+    border: none !important;
+    border-radius: 0 !important;
+    max-width: none !important;
+  }
+}

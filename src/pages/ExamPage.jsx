@@ -422,6 +422,14 @@ function Result({ exam, result, profile }) {
         </p>
       )}
       <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", marginTop: 16 }}>
+        {result.certificate && (
+          <button
+            onClick={() => navigate(`/certificate/${result.certificate.verify_code}`)}
+            style={{ background: C.hanko, color: "#fff", border: "none", borderRadius: 3, padding: "12px 24px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
+          >
+            View your certificate
+          </button>
+        )}
         <button
           onClick={() => navigate("/")}
           style={{ background: C.indigo, color: "#fff", border: "none", borderRadius: 3, padding: "12px 24px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
