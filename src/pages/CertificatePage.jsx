@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../AuthContext";
-import { C, fontBody, fontCertLabel, fontCertName, fontMono } from "../theme";
+import { C, fontBody, fontCertLabel, fontCertName, fontMono, logoMark } from "../theme";
 
 // Timothy's designed diploma (DIPLOMAS/blank diploma.pdf, rasterized at
 // 2400px). Dynamic fields are overlaid at percentages of the sheet; font
@@ -13,10 +13,10 @@ export default function CertificatePage() {
   const { code } = useParams();
   const { session } = useAuth();
   const [cert, setCert] = useState(undefined); // undefined = loading, null = not found
-  const [nameSize, setNameSize] = useState(null); // cqw, measured to fill the zone
+  const [nameMetric, setNameMetric] = useState(null); // rendered width per 1px of font size
 
-  // Measure the name in IvyPresto and size it to fill the awarded-to zone
-  // (63.5cqw wide): shorter names render much larger, long names shrink.
+  // Measure the name in IvyPresto so each template can size it to fill its
+  // own name zone: shorter names render much larger, long names shrink.
   useEffect(() => {
     if (!cert) return;
     let cancelled = false;
@@ -24,12 +24,13 @@ export default function CertificatePage() {
       if (cancelled) return;
       const ctx = document.createElement("canvas").getContext("2d");
       ctx.font = "400 100px ivypresto-display, Georgia, serif";
-      const widthPer100px = ctx.measureText(cert.profiles.full_name).width;
-      const byWidth = (63.5 * 0.94) / (widthPer100px / 100);
-      setNameSize(Math.min(byWidth, 10.5)); // height cap: zone is ~15.4cqw tall
+      setNameMetric(ctx.measureText(cert.profiles.full_name).width / 100);
     });
     return () => { cancelled = true; };
   }, [cert]);
+
+  // Professional zone: 63.5cqw wide, height-capped at 10.5cqw.
+  const nameSize = nameMetric ? Math.min((63.5 * 0.94) / nameMetric, 10.5) : null;
 
   // Dev-only mock so the diploma layout can be previewed without a session:
   // /certificate/PREVIEW (never matches in production builds)
@@ -41,10 +42,18 @@ export default function CertificatePage() {
       const params = new URLSearchParams(window.location.search);
       const mockName = params.get("name");
       const mockYear = params.get("year");
+      const mockType = params.get("type"); // "completion" previews the consumer template
       setCert({
         verify_code: "SSC-2026-QK7M3",
+        cert_type: mockType === "completion" ? "completion" : "professional",
         issued_at: mockYear ? `${mockYear}-07-17T12:00:00Z` : new Date().toISOString(),
-        attempts: { score_pct: 92, exams: { title: "Sake Server Certification", pass_pct: 80 } },
+        attempts: {
+          score_pct: 92,
+          exams: {
+            title: mockType === "completion" ? "Sake Fundamentals" : "Sake Server Certification",
+            pass_pct: 80,
+          },
+        },
         profiles: { full_name: mockName || "Alexandra Yamamoto-Rodriguez" },
       });
       return;
@@ -52,7 +61,7 @@ export default function CertificatePage() {
     if (!session) return;
     supabase
       .from("certificates")
-      .select("verify_code, issued_at, attempts:attempt_id(score_pct, exams:exam_id(title, pass_pct)), profiles:user_id(full_name)")
+      .select("verify_code, cert_type, issued_at, attempts:attempt_id(score_pct, exams:exam_id(title, pass_pct)), profiles:user_id(full_name)")
       .ilike("verify_code", code)
       .maybeSingle()
       .then(({ data }) => setCert(data ?? null));
@@ -85,6 +94,15 @@ export default function CertificatePage() {
   }).toUpperCase();
   const name = cert.profiles.full_name;
   const year = String(new Date(cert.issued_at).getFullYear());
+
+  if (cert.cert_type === "completion") {
+    return (
+      <div>
+        <CompletionSheet cert={cert} name={name} nameMetric={nameMetric} />
+        <PrintActions />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -128,20 +146,94 @@ export default function CertificatePage() {
           </div>
         </div>
       </div>
-      <div className="no-print" style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 24 }}>
-        <button
-          onClick={() => window.print()}
-          style={{ background: C.brandGreen, color: "#fff", border: "none", borderRadius: 0, padding: "12px 26px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
-        >
-          Print / save as PDF
-        </button>
-        <Link
-          to="/"
-          style={{ border: `1px solid ${C.line}`, color: C.ink, borderRadius: 0, padding: "12px 20px", fontSize: 14, textDecoration: "none", fontFamily: fontBody, background: "transparent" }}
-        >
-          Back to portal
-        </Link>
+      <PrintActions />
+    </div>
+  );
+}
+
+function PrintActions() {
+  return (
+    <div className="no-print" style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 24 }}>
+      <button
+        onClick={() => window.print()}
+        style={{ background: C.brandGreen, color: "#fff", border: "none", borderRadius: 0, padding: "12px 26px", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
+      >
+        Print / save as PDF
+      </button>
+      <Link
+        to="/"
+        style={{ border: `1px solid ${C.line}`, color: C.ink, borderRadius: 0, padding: "12px 20px", fontSize: 14, textDecoration: "none", fontFamily: fontBody, background: "transparent" }}
+      >
+        Back to portal
+      </Link>
+    </div>
+  );
+}
+
+// ————— Completion certificate (consumer track, spec §5) —————
+// Same brand system as the professional diploma — logo mark, brand green,
+// IvyPresto/Acumin — but warmer and lighter: rice paper ground, layered
+// wave motif from the mark, no verification code, no formal seal.
+function CompletionSheet({ cert, name, nameMetric }) {
+  const issuedWarm = new Date(cert.issued_at).toLocaleDateString("en-US", {
+    year: "numeric", month: "long", day: "numeric",
+  });
+  const courseTitle = cert.attempts?.exams?.title ?? "Sake Fundamentals";
+  // Name zone: 74cqw wide, capped lower than the pro diploma for warmth.
+  const size = nameMetric ? Math.min((74 * 0.94) / nameMetric, 9) : null;
+
+  return (
+    <div
+      className="cert-sheet"
+      style={{
+        position: "relative", maxWidth: 980, margin: "0 auto",
+        aspectRatio: "2400 / 1854", containerType: "inline-size",
+        background: "#faf7f2", border: `1px solid ${C.line}`, overflow: "hidden",
+      }}
+    >
+      {/* inner hairline frame, tan */}
+      <div style={{ position: "absolute", inset: "3.2%", border: `1px solid ${C.tan}`, pointerEvents: "none" }} />
+
+      {/* layered waves along the bottom — the logo mark's motif, unfurled */}
+      <svg
+        viewBox="0 0 1200 260"
+        preserveAspectRatio="none"
+        style={{ position: "absolute", left: 0, right: 0, bottom: 0, width: "100%", height: "21%", display: "block" }}
+      >
+        <path d="M0,150 C180,90 380,190 600,140 C820,90 1020,180 1200,120 L1200,260 L0,260 Z" fill={C.tan} opacity="0.45" />
+        <path d="M0,190 C220,130 420,220 640,170 C860,120 1040,210 1200,160 L1200,260 L0,260 Z" fill={C.amber} opacity="0.4" />
+        <path d="M0,215 C240,165 460,245 700,200 C920,160 1080,230 1200,195 L1200,260 L0,260 Z" fill={C.brandGreen} opacity="0.9" />
+      </svg>
+
+      {/* content column */}
+      <div style={{ position: "absolute", inset: "6% 10% 22%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", textAlign: "center" }}>
+        <img src={logoMark} alt="" style={{ width: "8.5cqw", height: "8.5cqw", display: "block" }} />
+        <p style={{ fontFamily: fontCertLabel, fontWeight: 700, fontSize: "1.55cqw", letterSpacing: "0.42em", textIndent: "0.42em", color: C.body, margin: "2.6cqw 0 0", textTransform: "uppercase" }}>
+          Certificate of Completion
+        </p>
+        <p style={{ fontFamily: fontCertName, fontStyle: "italic", fontSize: "1.9cqw", color: C.mist, margin: "3.4cqw 0 0" }}>
+          This certifies that
+        </p>
+        <div style={{ height: "11cqw", display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
+          <span style={{ fontFamily: fontCertName, fontWeight: 400, fontSize: `${size ?? 5}cqw`, lineHeight: 1.05, color: C.brandGreen, whiteSpace: "nowrap", visibility: size ? "visible" : "hidden" }}>
+            {name}
+          </span>
+        </div>
+        <p style={{ fontFamily: fontCertName, fontStyle: "italic", fontSize: "1.9cqw", color: C.mist, margin: 0 }}>
+          has completed the online course
+        </p>
+        <p style={{ fontFamily: fontCertName, fontWeight: 400, fontSize: "3.4cqw", color: C.ink, margin: "1.2cqw 0 0" }}>
+          {courseTitle}
+        </p>
+        <p style={{ fontFamily: fontCertLabel, fontWeight: 500, fontSize: "1.25cqw", letterSpacing: "0.3em", textIndent: "0.3em", color: C.gold, margin: "2.8cqw 0 0", textTransform: "uppercase" }}>
+          {issuedWarm}
+        </p>
       </div>
+
+      {/* footer, riding above the waves */}
+      <p style={{ position: "absolute", left: 0, right: 0, bottom: "13.5%", textAlign: "center", fontFamily: fontCertLabel, fontWeight: 600, fontSize: "1.15cqw", letterSpacing: "0.18em", textIndent: "0.18em", color: C.body, margin: 0, textTransform: "uppercase" }}>
+        Sake Studies Center at Brooklyn Kura · SakeStudiesCenter.com
+      </p>
     </div>
   );
 }
