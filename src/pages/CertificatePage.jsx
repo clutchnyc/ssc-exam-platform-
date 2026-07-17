@@ -23,7 +23,7 @@ export default function CertificatePage() {
       setCert({
         verify_code: "SSC-2026-QK7M3",
         issued_at: new Date().toISOString(),
-        attempts: { score_pct: 92, exams: { title: "Sake Fundamentals Certification", pass_pct: 80 } },
+        attempts: { score_pct: 92, exams: { title: "Sake Server Certification", pass_pct: 80 } },
         profiles: { full_name: "Alexandra Yamamoto-Rodriguez" },
       });
       return;

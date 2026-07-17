@@ -16,7 +16,7 @@ create table profiles (
 
 create table exams (
   id uuid primary key default gen_random_uuid(),
-  title text not null,                          -- "Sake Fundamentals Certification"
+  title text not null,                          -- "Sake Server Certification"
   slug text unique not null,                    -- "fundamentals"
   mode text not null check (mode in ('practice','certification')),
   question_count int not null default 8,        -- drawn per attempt (cert only)
@@ -140,8 +140,8 @@ create policy "certificates_select_own_or_admin" on certificates
 -- ============================================================
 
 insert into exams (title, slug, mode, question_count, time_limit_seconds, pass_pct, max_attempts, is_published) values
-  ('Sake Fundamentals Practice Quiz', 'practice',     'practice',      12, null, 80, null, true),
-  ('Sake Fundamentals Certification', 'fundamentals', 'certification',  8, 480,  80, 3,    true);
+  ('Sake Server Practice Quiz',   'practice',    'practice',      12, null, 80, null, true),
+  ('Sake Server Certification',   'sake-server', 'certification',  8, 480,  80, 3,    true);
 
 with q(prompt, options, correct_option, explanation) as (
   values
