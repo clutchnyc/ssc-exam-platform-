@@ -27,7 +27,7 @@ export default function EnrollPage() {
   useEffect(() => {
     supabase
       .from("courses")
-      .select("id, slug, title, track, delivery, price_cents, is_published")
+      .select("*")
       .eq("slug", slug)
       .eq("is_published", true)
       .maybeSingle()
@@ -117,10 +117,11 @@ export default function EnrollPage() {
           Online video course
         </p>
         <h1 style={{ fontFamily: fontDisplay, fontSize: 32, fontWeight: 700, lineHeight: 1.2, margin: "0 0 14px" }}>{course.title}</h1>
-        <p style={{ fontSize: 15, color: C.body, lineHeight: 1.65, margin: "0 0 8px" }}>
-          Learn sake at your own pace with short video modules from the Sake
-          Studies Center at Brooklyn Kura. Watch anywhere, download the course
-          materials, and finish with a completion quiz and certificate.
+        <p style={{ fontSize: 15, color: C.body, lineHeight: 1.65, margin: "0 0 8px", whiteSpace: "pre-wrap" }}>
+          {course.description ||
+            `Learn sake at your own pace with short video modules from the Sake
+Studies Center at Brooklyn Kura. Watch anywhere, download the course
+materials, and finish with a completion quiz and certificate.`}
         </p>
         <ul style={{ fontSize: 14.5, color: C.body, lineHeight: 1.9, margin: "0 0 22px", paddingLeft: 20 }}>
           <li>Streaming video lessons — watch and rewatch anytime</li>

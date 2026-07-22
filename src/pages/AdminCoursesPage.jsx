@@ -174,6 +174,7 @@ function NewCourseCard({ onCreated }) {
 
 function CourseEditor({ course, onChanged }) {
   const [title, setTitle] = useState(course.title);
+  const [description, setDescription] = useState(course.description ?? "");
   const [price, setPrice] = useState(course.price_cents != null ? String(course.price_cents / 100) : "");
   const [published, setPublished] = useState(course.is_published);
   const [saving, setSaving] = useState(false);
@@ -204,7 +205,7 @@ function CourseEditor({ course, onChanged }) {
     setSaved(false);
     const { error: err } = await supabase
       .from("courses")
-      .update({ title: title.trim(), is_published: published, price_cents: priceCents })
+      .update({ title: title.trim(), description: description.trim() || null, is_published: published, price_cents: priceCents })
       .eq("id", course.id);
     setSaving(false);
     if (err) return setError(err.message);
@@ -263,6 +264,18 @@ function CourseEditor({ course, onChanged }) {
           Published
         </label>
       </div>
+      {course.track === "consumer" && (
+        <div style={{ marginTop: 14, maxWidth: 720 }}>
+          <label style={labelStyle}>Sales page description (shown on /enroll/{course.slug})</label>
+          <textarea
+            value={description}
+            onChange={(e) => { setDescription(e.target.value); setSaved(false); }}
+            rows={4}
+            placeholder="Describe the course the way you'd pitch it to a student — this is the main paragraph on the public sales page."
+            style={{ ...inputStyle, resize: "vertical" }}
+          />
+        </div>
+      )}
       <p style={{ fontFamily: fontMono, fontSize: 11.5, color: C.mist, margin: "8px 0 0" }}>
         /course/{course.slug} · {course.track} · {course.delivery}
         {course.track === "consumer" && " · sales page: /enroll/" + course.slug}
