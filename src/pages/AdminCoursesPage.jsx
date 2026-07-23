@@ -177,6 +177,9 @@ function CourseEditor({ course, onChanged }) {
   const [description, setDescription] = useState(course.description ?? "");
   const [price, setPrice] = useState(course.price_cents != null ? String(course.price_cents / 100) : "");
   const [published, setPublished] = useState(course.is_published);
+  const [promoGuid, setPromoGuid] = useState(course.promo_video_ref ?? "");
+  const [promoNotice, setPromoNotice] = useState("");
+  const [checkingPromo, setCheckingPromo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -205,7 +208,13 @@ function CourseEditor({ course, onChanged }) {
     setSaved(false);
     const { error: err } = await supabase
       .from("courses")
-      .update({ title: title.trim(), description: description.trim() || null, is_published: published, price_cents: priceCents })
+      .update({
+        title: title.trim(),
+        description: description.trim() || null,
+        is_published: published,
+        price_cents: priceCents,
+        promo_video_ref: promoGuid.trim() || null,
+      })
       .eq("id", course.id);
     setSaving(false);
     if (err) return setError(err.message);
@@ -274,6 +283,39 @@ function CourseEditor({ course, onChanged }) {
             placeholder="Describe the course the way you'd pitch it to a student — this is the main paragraph on the public sales page."
             style={{ ...inputStyle, resize: "vertical" }}
           />
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 2fr) auto", gap: 10, alignItems: "end", marginTop: 12 }}>
+            <div>
+              <label style={labelStyle}>Sales video GUID (public intro on the sales page)</label>
+              <input
+                value={promoGuid}
+                onChange={(e) => { setPromoGuid(e.target.value); setPromoNotice(""); setSaved(false); }}
+                placeholder="Bunny GUID — blank for no video"
+                style={{ ...inputStyle, fontFamily: fontMono, fontSize: 13 }}
+              />
+            </div>
+            <button
+              onClick={async () => {
+                setCheckingPromo(true);
+                setPromoNotice("");
+                try {
+                  const info = await invokeFn("bunny-video-info", { video_ref: promoGuid.trim() });
+                  setPromoNotice(info.ready ? "✓ Found it — ready to stream." : "Found it, but Bunny is still processing it.");
+                } catch (err) {
+                  setPromoNotice(err.message || "Lookup failed.");
+                }
+                setCheckingPromo(false);
+              }}
+              disabled={checkingPromo || !promoGuid.trim()}
+              style={{ ...btnGhost, padding: "10px 16px", opacity: checkingPromo || !promoGuid.trim() ? 0.5 : 1 }}
+            >
+              {checkingPromo ? "Checking…" : "Look up"}
+            </button>
+          </div>
+          {promoNotice && <p style={{ fontSize: 13, color: promoNotice.startsWith("✓") ? C.green : C.hanko, margin: "8px 0 0" }}>{promoNotice}</p>}
+          <p style={{ fontSize: 12, color: C.mist, margin: "8px 0 0", lineHeight: 1.5 }}>
+            This video is PUBLIC — anyone visiting the sales page can watch it.
+            Keep course content out of it; it's your pitch.
+          </p>
         </div>
       )}
       <p style={{ fontFamily: fontMono, fontSize: 11.5, color: C.mist, margin: "8px 0 0" }}>

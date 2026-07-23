@@ -19,6 +19,7 @@ export default function EnrollPage() {
   const navigate = useNavigate();
 
   const [course, setCourse] = useState(undefined);
+  const [promoUrl, setPromoUrl] = useState(null); // signed sales-video embed
   const [enrolled, setEnrolled] = useState(undefined); // undefined = checking (when signed in)
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
@@ -33,6 +34,14 @@ export default function EnrollPage() {
       .maybeSingle()
       .then(({ data }) => setCourse(data ?? null));
   }, [slug]);
+
+  // Public sales video (if the course has one)
+  useEffect(() => {
+    if (!course?.promo_video_ref) return;
+    invokeFn("get-promo-token", { course_id: course.id })
+      .then((res) => setPromoUrl(res.embed_url))
+      .catch(() => { /* no video is a fine fallback */ });
+  }, [course]);
 
   // Enrollment check (signed-in only) + post-payment polling
   useEffect(() => {
@@ -112,7 +121,19 @@ export default function EnrollPage() {
 
   return (
     <div style={{ maxWidth: 640, margin: "0 auto" }}>
-      <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderTop: `3px solid ${C.brandGreen}`, padding: "36px 38px" }}>
+      <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderTop: `3px solid ${C.brandGreen}` }}>
+        {promoUrl && (
+          <div style={{ aspectRatio: "16 / 9", background: "#000" }}>
+            <iframe
+              src={promoUrl}
+              title={`${course.title} — course introduction`}
+              style={{ width: "100%", height: "100%", border: 0, display: "block" }}
+              allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture"
+              allowFullScreen
+            />
+          </div>
+        )}
+        <div style={{ padding: "36px 38px" }}>
         <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.2em", color: C.brandGreen, fontWeight: 600, margin: "0 0 10px" }}>
           Online video course
         </p>
@@ -170,6 +191,7 @@ materials, and finish with a completion quiz and certificate.`}
             {error && <p style={{ fontSize: 13, color: C.hanko, margin: "12px 0 0" }}>{error}</p>}
           </div>
         )}
+        </div>
       </div>
       <p style={{ fontFamily: fontMono, fontSize: 11.5, color: C.mist, textAlign: "center", marginTop: 14 }}>
         Questions? Contact us via SakeStudiesCenter.com
