@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../AuthContext";
 import { C, fontBody, fontDisplay, fontMono } from "../theme";
+import { examOrigin } from "../lib/host";
 import { AdminTabs } from "./AdminQuestionsPage";
 
 // Admin class management — create a class after it wraps, copy its invite
@@ -115,7 +116,9 @@ export default function AdminClassesPage() {
   }
 
   function copyLink(cls) {
-    const url = `${window.location.origin}/join/${cls.invite_code}`;
+    // Class invites always live on the exam domain — students landing on
+    // the courses storefront would never see the exam portal.
+    const url = `${examOrigin()}/join/${cls.invite_code}`;
     navigator.clipboard.writeText(url).then(() => {
       setCopied(cls.id);
       setTimeout(() => setCopied((c) => (c === cls.id ? null : c)), 2000);

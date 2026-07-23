@@ -1,5 +1,6 @@
 import { Link, Route, Routes, useNavigate } from "react-router-dom";
 import { isConfigured } from "./lib/supabase";
+import { siteMode } from "./lib/host";
 import { AuthProvider, useAuth } from "./AuthContext";
 import { C, fontBody, fontDisplay, fontMono, logoHorizontal } from "./theme";
 import Landing from "./pages/Landing";
@@ -71,7 +72,7 @@ function Header() {
       <Link to="/" style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", color: C.ink }}>
         <img src={logoHorizontal} alt="Sake Studies Center at Brooklyn Kura" style={{ height: 72, width: "auto", display: "block" }} />
         <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.18em", color: C.mist, borderLeft: `1px solid ${C.line}`, paddingLeft: 14 }}>
-          Exam Portal
+          {siteMode() === "courses" ? "Online Courses" : "Exam Portal"}
         </span>
       </Link>
       <nav style={{ display: "flex", gap: 12, alignItems: "center" }}>

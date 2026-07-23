@@ -5,19 +5,176 @@ import { useAuth } from "../AuthContext";
 import { C, fontBody, fontDisplay, fontMono } from "../theme";
 import { PENDING_JOIN_KEY } from "./JoinPage";
 import { PENDING_ENROLL_KEY } from "./EnrollPage";
+import { siteMode } from "../lib/host";
 
 export default function Landing() {
   const { session, profile, profileLoading } = useAuth();
+  const mode = siteMode(); // exam | courses | combined, by hostname
 
   if (session === undefined) return <Loading />;
-  if (!session) return <Hero />;
+  if (!session) return mode === "courses" ? <CoursesHero /> : <Hero />;
   if (profileLoading) return <Loading />;
   if (!profile) return <CompleteProfile />;
-  return <Catalog />;
+  return mode === "courses" ? <CoursesCatalog /> : <Catalog examOnly={mode === "exam"} />;
+}
+
+/** Finish a join/enroll link captured before sign-in/profile completed. */
+function usePendingRedirects(navigate) {
+  useEffect(() => {
+    const pending = localStorage.getItem(PENDING_JOIN_KEY);
+    if (pending) {
+      navigate(`/join/${encodeURIComponent(pending)}`, { replace: true });
+      return;
+    }
+    const pendingEnroll = localStorage.getItem(PENDING_ENROLL_KEY);
+    if (pendingEnroll) {
+      localStorage.removeItem(PENDING_ENROLL_KEY);
+      navigate(`/enroll/${encodeURIComponent(pendingEnroll)}`, { replace: true });
+    }
+  }, [navigate]);
 }
 
 function Loading() {
   return <p style={{ textAlign: "center", color: C.mist, fontFamily: fontMono, fontSize: 13, paddingTop: 60 }}>Loading…</p>;
+}
+
+// ————— courses.sakestudiescenter.com — consumer storefront —————
+
+function useCourseCatalog() {
+  const [catalog, setCatalog] = useState(null); // published video courses
+  useEffect(() => {
+    supabase
+      .from("courses")
+      .select("*")
+      .eq("is_published", true)
+      .eq("delivery", "video")
+      .order("created_at")
+      .then(({ data }) => setCatalog(data ?? []));
+  }, []);
+  return catalog;
+}
+
+function CourseCard({ course, enrolled, navigate }) {
+  const price = course.price_cents != null
+    ? `$${(course.price_cents / 100).toFixed(course.price_cents % 100 === 0 ? 0 : 2)}`
+    : null;
+  return (
+    <div style={{ background: C.paper, border: `1px solid ${C.line}`, borderTop: `3px solid ${C.brandGreen}`, borderRadius: 4, padding: 24, display: "flex", flexDirection: "column" }}>
+      <h2 style={{ fontFamily: fontDisplay, fontSize: 21, fontWeight: 700, margin: "0 0 10px" }}>{course.title}</h2>
+      <p style={{ fontSize: 14, lineHeight: 1.55, color: C.body, flex: 1, margin: "0 0 16px" }}>
+        {enrolled
+          ? "Pick up where you left off — your modules, materials, and quiz are waiting."
+          : (course.description?.split("\n")[0] ??
+            "Self-paced video course from the Sake Studies Center at Brooklyn Kura.")}
+      </p>
+      <button
+        onClick={() => navigate(enrolled ? `/course/${course.slug}` : `/enroll/${course.slug}`)}
+        style={{ background: C.brandGreen, color: "#fff", border: "none", borderRadius: 0, padding: "11px 0", fontSize: 14, fontWeight: 600, cursor: "pointer", fontFamily: fontBody }}
+      >
+        {enrolled ? "Go to course" : price ? `Learn more — ${price}` : "Learn more"}
+      </button>
+    </div>
+  );
+}
+
+function CoursesHero() {
+  const navigate = useNavigate();
+  const catalog = useCourseCatalog();
+
+  return (
+    <div style={{ textAlign: "center", paddingTop: 40 }}>
+      <p style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.2em", color: C.brandGreen, fontWeight: 600, marginBottom: 8 }}>Online courses</p>
+      <h1 style={{ fontFamily: fontDisplay, fontSize: 34, fontWeight: 700, lineHeight: 1.2, margin: "0 0 10px" }}>Learn sake, wherever you are.</h1>
+      <p style={{ color: C.body, maxWidth: 480, lineHeight: 1.6, margin: "0 auto 32px" }}>
+        Self-paced video courses from the Sake Studies Center at Brooklyn Kura —
+        watch anywhere, learn at your own pace, and earn your certificate.
+      </p>
+      {catalog === null ? (
+        <Loading />
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, maxWidth: 640, margin: "0 auto", textAlign: "left" }}>
+          {catalog.map((c) => <CourseCard key={c.id} course={c} enrolled={false} navigate={navigate} />)}
+        </div>
+      )}
+      <p style={{ fontSize: 13.5, color: C.mist, marginTop: 28 }}>
+        Already enrolled?{" "}
+        <Link to="/login" style={{ color: C.green, fontWeight: 600 }}>Sign in</Link>
+      </p>
+    </div>
+  );
+}
+
+function CoursesCatalog() {
+  const navigate = useNavigate();
+  const catalog = useCourseCatalog();
+  const [enrolledIds, setEnrolledIds] = useState(null);
+  const [certs, setCerts] = useState([]);
+
+  usePendingRedirects(navigate);
+  useEffect(() => {
+    supabase
+      .from("course_enrollments")
+      .select("course_id")
+      .eq("status", "active")
+      .then(({ data }) => setEnrolledIds(new Set((data ?? []).map((e) => e.course_id))));
+    supabase
+      .from("certificates")
+      .select("verify_code, issued_at, attempts:attempt_id(exams:exam_id(title))")
+      .order("issued_at", { ascending: false })
+      .then(({ data }) => setCerts(data ?? []));
+  }, []);
+
+  if (catalog === null || enrolledIds === null) return <Loading />;
+
+  const mine = catalog.filter((c) => enrolledIds.has(c.id));
+  const others = catalog.filter((c) => !enrolledIds.has(c.id));
+
+  return (
+    <div>
+      {mine.length > 0 && (
+        <div style={{ marginBottom: 36 }}>
+          <h2 style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 700, margin: "0 0 12px" }}>Your courses</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+            {mine.map((c) => <CourseCard key={c.id} course={c} enrolled navigate={navigate} />)}
+          </div>
+        </div>
+      )}
+      {others.length > 0 && (
+        <div style={{ marginBottom: 36 }}>
+          <h2 style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 700, margin: "0 0 12px" }}>
+            {mine.length > 0 ? "More courses" : "Courses"}
+          </h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+            {others.map((c) => <CourseCard key={c.id} course={c} enrolled={false} navigate={navigate} />)}
+          </div>
+        </div>
+      )}
+      {mine.length === 0 && others.length === 0 && (
+        <p style={{ fontSize: 14, color: C.mist, textAlign: "center", paddingTop: 40 }}>
+          No courses are open for enrollment right now — check back soon.
+        </p>
+      )}
+      {certs.length > 0 && (
+        <div>
+          <h2 style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 700, margin: "0 0 12px" }}>Your certificates</h2>
+          <div style={{ display: "grid", gap: 8 }}>
+            {certs.map((cert) => (
+              <Link
+                key={cert.verify_code}
+                to={`/certificate/${cert.verify_code}`}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", background: C.paper, border: `1px solid ${C.line}`, borderLeft: `3px solid ${C.gold}`, borderRadius: 4, padding: "13px 16px", textDecoration: "none", color: C.ink }}
+              >
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{cert.attempts.exams.title}</span>
+                <span style={{ fontFamily: fontMono, fontSize: 12, color: C.mist }}>
+                  {new Date(cert.issued_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Hero() {
@@ -88,7 +245,7 @@ function CompleteProfile() {
   );
 }
 
-function Catalog() {
+function Catalog({ examOnly = false }) {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const isAdmin = profile?.role === "admin";
@@ -98,19 +255,8 @@ function Catalog() {
   // undefined = checking, null = no valid class window, {name, expires_at} = open
   const [access, setAccess] = useState(isAdmin ? { admin: true } : undefined);
 
+  usePendingRedirects(navigate);
   useEffect(() => {
-    // A join/enroll link captured before sign-in/profile completes finishes here
-    const pending = localStorage.getItem(PENDING_JOIN_KEY);
-    if (pending) {
-      navigate(`/join/${encodeURIComponent(pending)}`, { replace: true });
-      return;
-    }
-    const pendingEnroll = localStorage.getItem(PENDING_ENROLL_KEY);
-    if (pendingEnroll) {
-      localStorage.removeItem(PENDING_ENROLL_KEY);
-      navigate(`/enroll/${encodeURIComponent(pendingEnroll)}`, { replace: true });
-      return;
-    }
     // Professional-track exams only — video-course quizzes live on their
     // course page, not the landing grid.
     supabase
@@ -152,7 +298,7 @@ function Catalog() {
 
   if (!exams || access === undefined || courses === null) return <Loading />;
 
-  if (access === null && courses.length === 0) {
+  if (access === null && (examOnly || courses.length === 0)) {
     // Signed in, but no open class window — the portal is students-only.
     return (
       <div>
@@ -202,7 +348,7 @@ function Catalog() {
           {new Date(access.expires_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
         </p>
       )}
-      {courses.length > 0 && (
+      {!examOnly && courses.length > 0 && (
         <div style={{ marginBottom: 36 }}>
           <h2 style={{ fontFamily: fontDisplay, fontSize: 18, fontWeight: 700, margin: "0 0 12px" }}>Your courses</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
